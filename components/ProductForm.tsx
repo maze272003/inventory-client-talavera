@@ -51,12 +51,14 @@ export default function ProductForm({ product, onClose }: Props) {
     if (isNaN(cost) || cost < 0) return "Cost price must be a number ≥ 0.";
     const sell = parseFloat(sellPrice);
     if (isNaN(sell) || sell < 0) return "Sell price must be a number ≥ 0.";
-    const threshold = parseFloat(reorderThreshold);
-    if (isNaN(threshold) || threshold < 0)
-      return "Reorder threshold must be a number ≥ 0.";
+    const threshold = parseInt(reorderThreshold, 10);
+    if (isNaN(threshold) || String(threshold) !== reorderThreshold.trim() || threshold < 0)
+      return "Reorder threshold must be a whole number ≥ 0.";
     if (!isEdit) {
-      const qty = parseFloat(stockQty || "0");
-      if (isNaN(qty) || qty < 0) return "Initial stock must be a number ≥ 0.";
+      const qty = parseInt(stockQty || "0", 10);
+      const stockQtyTrimmed = (stockQty || "0").trim();
+      if (isNaN(qty) || String(qty) !== stockQtyTrimmed || qty < 0)
+        return "Initial stock must be a whole number ≥ 0.";
     }
     return null;
   }
@@ -79,7 +81,7 @@ export default function ProductForm({ product, onClose }: Props) {
           category: category.trim(),
           costPrice: parseFloat(costPrice),
           sellPrice: parseFloat(sellPrice),
-          reorderThreshold: parseFloat(reorderThreshold),
+          reorderThreshold: parseInt(reorderThreshold, 10),
         });
       } else {
         await createProduct({
@@ -88,8 +90,8 @@ export default function ProductForm({ product, onClose }: Props) {
           category: category.trim(),
           costPrice: parseFloat(costPrice),
           sellPrice: parseFloat(sellPrice),
-          stockQty: parseFloat(stockQty || "0"),
-          reorderThreshold: parseFloat(reorderThreshold),
+          stockQty: parseInt(stockQty || "0", 10),
+          reorderThreshold: parseInt(reorderThreshold, 10),
         });
       }
       onClose();

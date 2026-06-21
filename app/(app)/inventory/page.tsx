@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -28,11 +28,24 @@ type DialogState =
 
 function ProductPickerAndActions() {
   const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState<string | undefined>(undefined);
   const [dialog, setDialog] = useState<DialogState>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const trimmed = searchInput.trim();
+      setSearch(trimmed !== "" ? trimmed : undefined);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchInput]);
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.products.list,
-    { search: searchInput.trim() !== "" ? searchInput.trim() : undefined },
+    { search },
     { initialNumItems: 20 }
   );
 

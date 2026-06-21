@@ -27,9 +27,9 @@ export default function AdjustDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const qty = parseFloat(newQuantity);
-    if (isNaN(qty) || qty < 0) {
-      setError("New quantity must be a number ≥ 0.");
+    const qty = parseInt(newQuantity, 10);
+    if (isNaN(qty) || String(qty) !== newQuantity.trim() || qty < 0) {
+      setError("New quantity must be a whole number ≥ 0.");
       return;
     }
     if (!reason.trim()) {
@@ -48,7 +48,7 @@ export default function AdjustDialog({
     }
   }
 
-  const parsedQty = parseFloat(newQuantity);
+  const parsedQty = parseInt(newQuantity, 10);
   const delta = isNaN(parsedQty) ? null : parsedQty - currentQty;
 
   return (

@@ -21,9 +21,9 @@ export default function StockInDialog({ productId, productName, onClose }: Props
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const qty = parseFloat(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      setError("Quantity must be greater than 0.");
+    const qty = parseInt(quantity, 10);
+    if (isNaN(qty) || String(qty) !== quantity.trim() || qty <= 0) {
+      setError("Quantity must be a whole number greater than 0.");
       return;
     }
     const cost = unitCost.trim() ? parseFloat(unitCost) : undefined;

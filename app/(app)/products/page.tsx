@@ -27,6 +27,8 @@ export default function ProductsPage() {
   const [category, setCategory] = useState<string | undefined>(undefined);
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductDoc | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<Id<"products"> | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setActive = useMutation(api.products.setActive);
@@ -76,7 +78,16 @@ export default function ProductsPage() {
   }
 
   async function toggleActive(product: ProductDoc) {
-    await setActive({ id: product._id, isActive: !product.isActive });
+    if (togglingId !== null) return;
+    setTogglingId(product._id);
+    setToggleError(null);
+    try {
+      await setActive({ id: product._id, isActive: !product.isActive });
+    } catch (err: unknown) {
+      setToggleError(err instanceof Error ? err.message : "Failed to update product status.");
+    } finally {
+      setTogglingId(null);
+    }
   }
 
   return (
@@ -90,6 +101,12 @@ export default function ProductsPage() {
           + Add Product
         </button>
       </div>
+
+      {toggleError && (
+        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+          {toggleError}
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 mb-4 flex-wrap">
@@ -220,13 +237,18 @@ export default function ProductsPage() {
                           </button>
                           <button
                             onClick={() => toggleActive(product as ProductDoc)}
-                            className={`text-xs px-2 py-1 rounded transition-colors ${
+                            disabled={togglingId === product._id}
+                            className={`text-xs px-2 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                               product.isActive
                                 ? "bg-red-50 hover:bg-red-100 text-red-700"
                                 : "bg-green-50 hover:bg-green-100 text-green-700"
                             }`}
                           >
-                            {product.isActive ? "Deactivate" : "Activate"}
+                            {togglingId === product._id
+                              ? "..."
+                              : product.isActive
+                                ? "Deactivate"
+                                : "Activate"}
                           </button>
                         </div>
                       </td>
