@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { paginationOptsValidator } from "convex/server";
+import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { requireUser } from "./lib/auth";
 
 async function nextReceiptNumber(ctx: MutationCtx): Promise<number> {
@@ -117,12 +117,28 @@ export const listReceipts = query({
   },
   handler: async (ctx, args) => {
     await requireUser(ctx);
+
+    async function enrichPage(result: PaginationResult<Doc<"sales">>) {
+      const page = await Promise.all(
+        result.page.map(async (sale) => {
+          const profile = await ctx.db
+            .query("userProfiles")
+            .withIndex("by_userId", (q) => q.eq("userId", sale.cashierId))
+            .unique();
+          return { ...sale, cashierName: profile?.name ?? "Unknown" };
+        })
+      );
+      return { ...result, page };
+    }
+
     if (args.receiptNumber !== undefined) {
-      return await ctx.db
+      const result = await ctx.db
         .query("sales")
         .withIndex("by_receiptNumber", (q) => q.eq("receiptNumber", args.receiptNumber!))
         .paginate(args.paginationOpts);
+      return enrichPage(result);
     }
-    return await ctx.db.query("sales").order("desc").paginate(args.paginationOpts);
+    const result = await ctx.db.query("sales").order("desc").paginate(args.paginationOpts);
+    return enrichPage(result);
   },
 });

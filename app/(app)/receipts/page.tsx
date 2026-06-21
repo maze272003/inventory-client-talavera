@@ -65,6 +65,9 @@ export default function ReceiptsPage() {
               <div className="text-sm text-gray-500 mb-3">
                 {formatDate(sale._creationTime)}
               </div>
+              <div className="text-xs text-gray-400 mb-3">
+                Cashier: {sale.cashierName}
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs text-gray-400">Total</span>
                 <span className="text-base font-semibold text-gray-900 tabular-nums">
