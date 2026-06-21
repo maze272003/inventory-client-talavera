@@ -10,6 +10,7 @@ import PurchaseLineRow, {
   emptyDraft,
   isDraftValid,
 } from "@/components/PurchaseLineRow";
+import type { ParsedInvoice } from "@/lib/ocr/types";
 import { formatPeso } from "@/lib/format";
 
 type CreateLine =
@@ -62,6 +63,12 @@ export default function ImportPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // OCR auto-extract state
+  const [currentFile, setCurrentFile] = useState<File | null>(null);
+  const [ocrStage, setOcrStage] = useState<string | null>(null);
+  const [ocrFraction, setOcrFraction] = useState(0);
+  const [ocrError, setOcrError] = useState<string | null>(null);
+
   // Header fields
   const [supplierName, setSupplierName] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
@@ -104,6 +111,10 @@ export default function ImportPage() {
     });
     setStorageId(null);
     setUploading(true);
+    // Keep the raw File so "Re-extract" can re-run; kick off OCR on the local
+    // File in parallel with the storage upload (independent of it).
+    setCurrentFile(file);
+    void runExtraction(file);
     try {
       const url = await generateUploadUrl();
       const res = await fetch(url, {
@@ -119,6 +130,42 @@ export default function ImportPage() {
     } finally {
       setUploading(false);
     }
+  }
+
+  async function runExtraction(file: File) {
+    setOcrError(null);
+    setOcrStage("Starting");
+    setOcrFraction(0);
+    try {
+      const { extractInvoice } = await import("@/lib/ocr/extractInvoice");
+      const parsed = await extractInvoice(file, ({ stage, fraction }) => {
+        setOcrStage(stage);
+        setOcrFraction(fraction);
+      });
+      applyParsed(parsed);
+    } catch (e) {
+      setOcrError(e instanceof Error ? e.message : "Extraction failed");
+    } finally {
+      setOcrStage(null);
+    }
+  }
+
+  function applyParsed(parsed: ParsedInvoice) {
+    if (parsed.supplierName && supplierName.trim() === "")
+      setSupplierName(parsed.supplierName);
+    if (parsed.referenceNumber && referenceNumber.trim() === "")
+      setReferenceNumber(parsed.referenceNumber);
+    const newDrafts: PurchaseLineDraft[] = parsed.lines.map((l) => ({
+      ...emptyDraft(),
+      mode: "new" as const,
+      newName: l.item ?? "",
+      newModel: l.model ?? "",
+      newCategory: "",
+      newSellPrice: "",
+      quantity: l.quantity != null ? String(l.quantity) : "1",
+      unitCost: l.unitCost != null ? String(l.unitCost) : "",
+    }));
+    setDrafts(newDrafts.length > 0 ? newDrafts : [emptyDraft()]);
   }
 
   function updateDraft(index: number, draft: PurchaseLineDraft) {
@@ -186,6 +233,10 @@ export default function ImportPage() {
     setDrafts([emptyDraft()]);
     setSubmitError(null);
     setUploadError(null);
+    setCurrentFile(null);
+    setOcrStage(null);
+    setOcrFraction(0);
+    setOcrError(null);
   }
 
   function newImport() {
@@ -257,6 +308,48 @@ export default function ImportPage() {
             <p className="mt-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
               {uploadError}
             </p>
+          )}
+
+          {/* OCR auto-extract status */}
+          {ocrStage !== null && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+                <span>Reading invoice: {ocrStage}</span>
+                <span>{Math.round(ocrFraction * 100)}%</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                <div
+                  className="h-full bg-blue-600 transition-all"
+                  style={{ width: `${Math.round(ocrFraction * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {ocrError && (
+            <p className="mt-2 text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              Auto-extract failed: {ocrError}. You can still fill in the lines
+              manually below.
+            </p>
+          )}
+
+          {currentFile && (
+            <div className="mt-3 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentFile) void runExtraction(currentFile);
+                }}
+                disabled={ocrStage !== null}
+                className="text-sm px-3 py-1.5 rounded-lg font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {ocrStage !== null ? "Extracting..." : "Re-extract"}
+              </button>
+              <p className="text-xs text-gray-500">
+                Review the extracted rows against the document and correct any
+                mistakes before importing.
+              </p>
+            </div>
           )}
 
           <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
