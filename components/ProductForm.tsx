@@ -130,17 +130,17 @@ export default function ProductForm({ product, onClose }: Props) {
       }
 
       if (isEdit) {
-        // Build args conditionally — only include imageId/model when present
+        // Build args — model is always included (empty string clears it); imageId is conditional
         const updateArgs: Parameters<typeof updateProduct>[0] = {
           id: product._id,
           name: name.trim(),
           sku: sku.trim(),
           category: category.trim(),
+          model: model.trim(),
           costPrice: parseFloat(costPrice),
           sellPrice: parseFloat(sellPrice),
           reorderThreshold: parseInt(reorderThreshold, 10),
         };
-        if (model.trim()) updateArgs.model = model.trim();
         if (imageId) updateArgs.imageId = imageId;
         await updateProduct(updateArgs);
       } else {
@@ -148,12 +148,12 @@ export default function ProductForm({ product, onClose }: Props) {
           name: name.trim(),
           sku: sku.trim(),
           category: category.trim(),
+          model: model.trim(),
           costPrice: parseFloat(costPrice),
           sellPrice: parseFloat(sellPrice),
           stockQty: parseInt(stockQty || "0", 10),
           reorderThreshold: parseInt(reorderThreshold, 10),
         };
-        if (model.trim()) createArgs.model = model.trim();
         if (imageId) createArgs.imageId = imageId;
         await createProduct(createArgs);
       }
