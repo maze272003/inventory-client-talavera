@@ -157,7 +157,7 @@ export default function ImportPage() {
         fileId: storageId,
         supplierName: supplierName.trim(),
         referenceNumber: referenceNumber.trim() !== "" ? referenceNumber.trim() : undefined,
-        purchaseDate: new Date(purchaseDate).getTime(),
+        purchaseDate: new Date(purchaseDate + "T00:00:00").getTime(),
         lines,
       });
       setSummary({
@@ -324,7 +324,7 @@ export default function ImportPage() {
           <div className="space-y-3">
             {drafts.map((draft, index) => (
               <PurchaseLineRow
-                key={index}
+                key={draft.id}
                 index={index}
                 draft={draft}
                 onChange={updateDraft}

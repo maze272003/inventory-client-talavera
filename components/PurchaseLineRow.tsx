@@ -6,6 +6,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 
 export type PurchaseLineDraft = {
+  id: string;
   mode: "existing" | "new";
   // existing
   existingProductId: Id<"products"> | null;
@@ -22,6 +23,7 @@ export type PurchaseLineDraft = {
 
 export function emptyDraft(): PurchaseLineDraft {
   return {
+    id: crypto.randomUUID(),
     mode: "existing",
     existingProductId: null,
     existingLabel: "",
@@ -105,7 +107,13 @@ export default function PurchaseLineRow({ index, draft, onChange, onRemove }: Pr
   }
 
   function selectMode(mode: "existing" | "new") {
-    set({ mode });
+    if (mode === "new") {
+      setSearchInput("");
+      setShowResults(false);
+      set({ mode, existingProductId: null, existingLabel: "" });
+    } else {
+      set({ mode, newName: "", newModel: "", newCategory: "", newSellPrice: "" });
+    }
   }
 
   function selectProduct(p: { _id: Id<"products">; name: string; model?: string; sku: string }) {
