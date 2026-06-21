@@ -43,7 +43,7 @@ export default function Cart({ items, onUpdate }: Props) {
           const overStock = item.quantity > item.stockQty;
           return (
             <div
-              key={`${item.productId}-${index}`}
+              key={item.productId}
               className={`rounded-lg border p-3 ${
                 overStock ? "border-amber-400 bg-amber-50" : "border-gray-200 bg-white"
               }`}

@@ -35,14 +35,15 @@ body {
 }
 
 @media print {
-  body > * { display: none !important; }
+  body * { visibility: hidden; }
+  .receipt-print, .receipt-print * { visibility: visible; }
   .receipt-print {
-    display: block !important;
+    position: absolute;
+    top: 0;
+    left: 0;
     width: var(--receipt-width);
-    max-width: var(--receipt-width);
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
     line-height: 1.4;
-    margin: 0 auto;
   }
 }
