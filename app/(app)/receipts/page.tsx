@@ -26,7 +26,7 @@ export default function ReceiptsPage() {
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Receipts</h1>
 
       {/* Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         <label
           htmlFor="receipt-search"
           className="block text-sm font-medium text-gray-700 mb-1"
@@ -43,67 +43,51 @@ export default function ReceiptsPage() {
         />
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        {results.length === 0 && status === "Exhausted" ? (
-          <p className="p-6 text-sm text-gray-500 text-center">No receipts found.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">
-                  Receipt #
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-600">
-                  Date
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">
-                  Items
-                </th>
-                <th className="px-4 py-3 text-right font-semibold text-gray-600">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {results.map((sale) => (
-                <tr key={sale._id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/receipts/${sale._id}`}
-                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      #{sale.receiptNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {formatDate(sale._creationTime)}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-600 tabular-nums">
-                    {sale.itemCount}
-                  </td>
-                  <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                    {formatPeso(sale.total)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {/* Load more */}
-        {status === "CanLoadMore" && (
-          <div className="p-4 border-t border-gray-100 text-center">
-            <button
-              type="button"
-              onClick={() => loadMore(20)}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      {/* Card grid */}
+      {results.length === 0 && status === "Exhausted" ? (
+        <p className="p-6 text-sm text-gray-500 text-center">No receipts found.</p>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {results.map((sale) => (
+            <Link
+              key={sale._id}
+              href={`/receipts/${sale._id}`}
+              className="block bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-blue-300 transition-all"
             >
-              Load more
-            </button>
-          </div>
-        )}
-      </div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-lg font-bold text-blue-600">
+                  #{sale.receiptNumber}
+                </span>
+                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
+                  {sale.itemCount} {sale.itemCount === 1 ? "item" : "items"}
+                </span>
+              </div>
+              <div className="text-sm text-gray-500 mb-3">
+                {formatDate(sale._creationTime)}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400">Total</span>
+                <span className="text-base font-semibold text-gray-900 tabular-nums">
+                  {formatPeso(sale.total)}
+                </span>
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Load more */}
+      {status === "CanLoadMore" && (
+        <div className="mt-6 text-center">
+          <button
+            type="button"
+            onClick={() => loadMore(20)}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            Load more
+          </button>
+        </div>
+      )}
     </div>
   );
 }

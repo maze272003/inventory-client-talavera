@@ -95,9 +95,30 @@ export default function Receipt({ saleId }: Props) {
               {items.map((item, i) => (
                 <tr key={i}>
                   <td className="py-0.5 pr-2">
-                    <div>{item.nameSnapshot}</div>
-                    <div className="text-gray-500">
-                      {item.quantity} × {formatPeso(item.unitSellPrice)}
+                    <div className="flex items-start gap-2">
+                      {/* Thumbnail — screen only, excluded from print */}
+                      <span className="screen-only flex-shrink-0">
+                        {item.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.imageUrl}
+                            alt={item.nameSnapshot}
+                            width={40}
+                            height={40}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <span className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded text-gray-400 text-xs">
+                            —
+                          </span>
+                        )}
+                      </span>
+                      <div>
+                        <div>{item.nameSnapshot}</div>
+                        <div className="text-gray-500">
+                          {item.quantity} × {formatPeso(item.unitSellPrice)}
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="text-right py-0.5 align-top tabular-nums">

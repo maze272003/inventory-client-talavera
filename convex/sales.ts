@@ -98,7 +98,15 @@ export const getSale = query({
       .query("saleItems")
       .withIndex("by_sale", (q) => q.eq("saleId", args.saleId))
       .take(200);
-    return { sale, items };
+    const itemsWithImages = await Promise.all(
+      items.map(async (it) => {
+        const product = await ctx.db.get("products", it.productId);
+        const imageUrl =
+          product?.imageId ? await ctx.storage.getUrl(product.imageId) : null;
+        return { ...it, imageUrl };
+      })
+    );
+    return { sale, items: itemsWithImages };
   },
 });
 
