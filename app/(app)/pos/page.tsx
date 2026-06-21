@@ -5,6 +5,7 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import ProductSearch, { CartItem } from "@/components/ProductSearch";
+import ProductGrid from "@/components/ProductGrid";
 import Cart from "@/components/Cart";
 import Receipt from "@/components/Receipt";
 import { formatPeso } from "@/lib/format";
@@ -15,6 +16,7 @@ export default function PosPage() {
   const [completedSaleId, setCompletedSaleId] = useState<Id<"sales"> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [gridSearch, setGridSearch] = useState("");
 
   const createSale = useMutation(api.sales.createSale);
 
@@ -85,12 +87,36 @@ export default function PosPage() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Point of Sale</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column: product search + cart */}
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Left + centre: scan box, product grid, cart */}
+        <div className="xl:col-span-2 space-y-4">
+          {/* Scan / SKU lookup */}
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <ProductSearch onAddToCart={handleAddToCart} />
           </div>
+
+          {/* Browse grid */}
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="mb-3">
+              <label
+                htmlFor="grid-search"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Browse products
+              </label>
+              <input
+                id="grid-search"
+                type="text"
+                value={gridSearch}
+                onChange={(e) => setGridSearch(e.target.value)}
+                placeholder="Filter by name…"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <ProductGrid search={gridSearch} onAdd={handleAddToCart} />
+          </div>
+
+          {/* Cart */}
           <div className="bg-white rounded-xl border border-gray-200 p-4 min-h-[200px]">
             <Cart items={cart} onUpdate={setCart} />
           </div>
