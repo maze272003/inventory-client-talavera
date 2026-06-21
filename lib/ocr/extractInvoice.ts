@@ -16,6 +16,7 @@ export async function extractInvoice(
       stage: `Reading page ${i + 1} of ${canvases.length}`,
       fraction: 0,
     });
+    const pageHeight = canvases[i].height;
     const pre = preprocess(canvases[i]);
     const { words } = await runOcr(pre, (f) =>
       onProgress({
@@ -24,7 +25,7 @@ export async function extractInvoice(
       }),
     );
     // Offset y by page so multi-page rows don't collide (page height + gap).
-    const yOffset = i * (canvases[i].height + 50);
+    const yOffset = i * (pageHeight + 50);
     for (const w of words) {
       allWords.push({
         ...w,

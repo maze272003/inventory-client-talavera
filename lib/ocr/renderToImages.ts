@@ -1,6 +1,8 @@
 import * as pdfjsLib from "pdfjs-dist";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf/pdf.worker.min.mjs";
+if (typeof window !== "undefined") {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf/pdf.worker.min.mjs";
+}
 
 const MAX_PAGES = 5;
 const SCALE = 2;
