@@ -103,12 +103,12 @@ export const getPurchase = query({
     if (!purchase) return null;
     const ledgerRows = await ctx.db
       .query("inventoryLedger")
-      .withIndex("by_type", (q) => q.eq("type", "stock_in"))
+      .withIndex("by_purchase", (q) => q.eq("purchaseId", args.purchaseId))
       .take(1000);
     return {
       purchase,
       fileUrl: await ctx.storage.getUrl(purchase.fileId),
-      ledgerRows: ledgerRows.filter((r) => r.purchaseId === args.purchaseId),
+      ledgerRows,
     };
   },
 });

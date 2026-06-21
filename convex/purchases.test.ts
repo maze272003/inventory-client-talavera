@@ -67,6 +67,49 @@ test("createPurchase rejects a line with neither existing nor new product", asyn
   ).rejects.toThrow();
 });
 
+test("getPurchase returns purchase with correct totals, fileUrl, and exact ledgerRows for that purchase", async () => {
+  const t = convexTest(schema, modules);
+  const { t: admin } = await asAdmin(t);
+  const fileId = await fakeFileId(t);
+
+  // Create a product to use as an existing product line
+  const existingPid = await admin.mutation(api.products.create, {
+    name: "Chain Lube GP", sku: "CLGP1", category: "Lubricants", costPrice: 80, sellPrice: 120, stockQty: 5, reorderThreshold: 2,
+  });
+
+  const res = await admin.mutation(api.purchases.createPurchase, {
+    fileId,
+    supplierName: "Supplier X",
+    referenceNumber: "REF-001",
+    purchaseDate: 1,
+    lines: [
+      { newProduct: { name: "New Brake Pad", category: "Brakes", sellPrice: 500 }, quantity: 3, unitCost: 400 },
+      { existingProductId: existingPid, quantity: 10, unitCost: 80 },
+    ],
+  });
+
+  const { purchaseId } = res;
+  const expectedTotal = 400 * 3 + 80 * 10;
+  const expectedItemCount = 3 + 10;
+
+  const result = await admin.query(api.purchases.getPurchase, { purchaseId });
+
+  // purchase header fields
+  expect(result).not.toBeNull();
+  expect(result!.purchase.total).toEqual(expectedTotal);
+  expect(result!.purchase.itemCount).toEqual(expectedItemCount);
+
+  // fileUrl is non-null
+  expect(result!.fileUrl).not.toBeNull();
+
+  // ledgerRows: exactly 2 rows, all for this purchase, all stock_in
+  expect(result!.ledgerRows).toHaveLength(2);
+  for (const row of result!.ledgerRows) {
+    expect(row.purchaseId).toEqual(purchaseId);
+    expect(row.type).toEqual("stock_in");
+  }
+});
+
 test("createPurchase atomic rollback: invalid 2nd line leaves 1st product unchanged", async () => {
   const t = convexTest(schema, modules);
   const { t: admin } = await asAdmin(t);

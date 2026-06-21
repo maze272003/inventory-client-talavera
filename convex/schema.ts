@@ -47,7 +47,8 @@ export default defineSchema({
     userId: v.id("users"),
   })
     .index("by_product", ["productId"])
-    .index("by_type", ["type"]),
+    .index("by_type", ["type"])
+    .index("by_purchase", ["purchaseId"]),
 
   sales: defineTable({
     receiptNumber: v.number(),
