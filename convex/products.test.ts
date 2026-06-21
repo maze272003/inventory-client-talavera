@@ -41,7 +41,7 @@ test("create product writes opening ledger and is found by sku", async () => {
     return await ctx.db
       .query("inventoryLedger")
       .withIndex("by_product", (q) => q.eq("productId", id))
-      .collect();
+      .take(5);
   });
   expect(ledgerRows).toHaveLength(1);
   const row = ledgerRows[0];
