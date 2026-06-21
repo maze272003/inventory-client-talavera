@@ -1,12 +1,75 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { authTables } from "@convex-dev/auth/server";
 
-// The schema is entirely optional.
-// You can delete this file (schema.ts) and the
-// app will continue to work.
-// The schema provides more precise TypeScript types.
+export const roleValidator = v.union(v.literal("admin"), v.literal("cashier"));
+export const ledgerTypeValidator = v.union(
+  v.literal("sale"),
+  v.literal("stock_in"),
+  v.literal("adjustment"),
+);
+
 export default defineSchema({
-  numbers: defineTable({
+  ...authTables,
+  // Per-user app profile (role). Keyed to the auth users table.
+  userProfiles: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    role: roleValidator,
+  }).index("by_userId", ["userId"]),
+
+  products: defineTable({
+    name: v.string(),
+    sku: v.string(),
+    category: v.string(),
+    costPrice: v.number(),
+    sellPrice: v.number(),
+    stockQty: v.number(),
+    reorderThreshold: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_sku", ["sku"])
+    .index("by_category", ["category"])
+    .index("by_active", ["isActive"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["isActive"] }),
+
+  inventoryLedger: defineTable({
+    productId: v.id("products"),
+    type: ledgerTypeValidator,
+    quantityDelta: v.number(),
+    balanceAfter: v.number(),
+    unitCost: v.optional(v.number()),
+    reason: v.optional(v.string()),
+    saleId: v.optional(v.id("sales")),
+    userId: v.id("users"),
+  })
+    .index("by_product", ["productId"])
+    .index("by_type", ["type"]),
+
+  sales: defineTable({
+    receiptNumber: v.number(),
+    total: v.number(),
+    itemCount: v.number(),
+    cashTendered: v.number(),
+    changeGiven: v.number(),
+    cashierId: v.id("users"),
+  }).index("by_receiptNumber", ["receiptNumber"]),
+
+  saleItems: defineTable({
+    saleId: v.id("sales"),
+    productId: v.id("products"),
+    nameSnapshot: v.string(),
+    skuSnapshot: v.string(),
+    unitSellPrice: v.number(),
+    unitCostPrice: v.number(),
+    quantity: v.number(),
+    lineTotal: v.number(),
+  })
+    .index("by_sale", ["saleId"])
+    .index("by_product", ["productId"]),
+
+  counters: defineTable({
+    name: v.string(),
     value: v.number(),
-  }),
+  }).index("by_name", ["name"]),
 });
