@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatPeso } from "@/lib/format";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import DateRangePicker from "@/components/DateRangePicker";
 
 type Preset = "daily" | "weekly" | "monthly" | "custom";
@@ -117,12 +118,93 @@ export default function ReportsPage() {
 
   const today = toDateString(new Date());
 
+  // Derive a display label for the active range (used in filenames)
+  const rangeLabel =
+    preset === "custom" && customFrom && customTo
+      ? `${customFrom}_${customTo}`
+      : preset === "daily"
+      ? today
+      : preset === "weekly"
+      ? "last-7-days"
+      : "last-30-days";
+
+  function handleExportCsv() {
+    const summaryColumns = [
+      { key: "label", header: "Period" },
+      { key: "revenue", header: "Revenue" },
+      { key: "profit", header: "Profit" },
+      { key: "unitsSold", header: "Units Sold" },
+      { key: "saleCount", header: "Transactions" },
+    ];
+    const summaryRows = summary
+      ? [
+          {
+            label: rangeLabel,
+            revenue: summary.revenue,
+            profit: summary.profit,
+            unitsSold: summary.unitsSold,
+            saleCount: summary.saleCount,
+          },
+        ]
+      : [];
+
+    const productColumns = [
+      { key: "rank", header: "Rank" },
+      { key: "name", header: "Product" },
+      { key: "unitsSold", header: "Units Sold" },
+      { key: "revenue", header: "Revenue" },
+    ];
+    const productRows = (topProducts ?? []).map((p, i) => ({
+      rank: i + 1,
+      name: p.name,
+      unitsSold: p.unitsSold,
+      revenue: p.revenue,
+    }));
+
+    // Combine: summary section then blank separator then top products
+    const summarySection = toCsv(summaryRows, summaryColumns);
+    const productsSection = toCsv(productRows, productColumns);
+    const csv = `${summarySection}\r\n\r\n${productsSection}`;
+
+    downloadCsv(`report-${rangeLabel}.csv`, csv);
+  }
+
+  function handlePrint() {
+    document.body.classList.add("printing-report");
+    const cleanup = () => {
+      document.body.classList.remove("printing-report");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
+        {/* Export controls */}
+        <div className="flex gap-2 screen-only">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={!summary}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Excel (CSV)
+          </button>
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
+          >
+            Print / PDF
+          </button>
+        </div>
+      </div>
 
       {/* Preset toggle */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center screen-only">
         {presets.map((p) => (
           <button
             key={p.id}
@@ -141,7 +223,7 @@ export default function ReportsPage() {
 
       {/* Custom date range picker */}
       {preset === "custom" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 screen-only">
           <DateRangePicker
             from={customFrom}
             to={customTo}
@@ -158,83 +240,86 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* Range label */}
-      {(preset !== "custom" || customRangeReady) && (
-        <p className="text-xs text-gray-400">
-          {preset === "custom"
-            ? `${customFrom} to ${customTo}`
-            : preset === "daily"
-            ? `Today (${today})`
-            : preset === "weekly"
-            ? "Last 7 days"
-            : "Last 30 days"}
-        </p>
-      )}
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
-          label="Revenue"
-          value={summary ? formatPeso(summary.revenue) : "—"}
-        />
-        <SummaryCard
-          label="Profit"
-          value={summary ? formatPeso(summary.profit) : "—"}
-        />
-        <SummaryCard
-          label="Units Sold"
-          value={summary ? String(summary.unitsSold) : "—"}
-        />
-        <SummaryCard
-          label="Transactions"
-          value={summary ? String(summary.saleCount) : "—"}
-        />
-      </div>
-
-      {/* Top products table */}
-      <section className="bg-white rounded-xl border border-gray-200 p-5">
-        <h2 className="text-base font-semibold text-gray-800 mb-4">Top Products</h2>
-        {topProducts === undefined ? (
-          <p className="text-sm text-gray-400">Loading…</p>
-        ) : topProducts.length === 0 ? (
-          <p className="text-sm text-gray-500">No sales in this period.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                    #
-                  </th>
-                  <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                    Product
-                  </th>
-                  <th className="text-right py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                    Units Sold
-                  </th>
-                  <th className="text-right py-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                    Revenue
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {topProducts.map((p, i) => (
-                  <tr key={p.productId} className="hover:bg-gray-50">
-                    <td className="py-2 pr-4 text-gray-400 tabular-nums">{i + 1}</td>
-                    <td className="py-2 pr-4 font-medium text-gray-900">{p.name}</td>
-                    <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
-                      {p.unitsSold}
-                    </td>
-                    <td className="py-2 text-right tabular-nums font-semibold text-gray-900">
-                      {formatPeso(p.revenue)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Printable report container */}
+      <div className="report-print">
+        {/* Range label */}
+        {(preset !== "custom" || customRangeReady) && (
+          <p className="text-xs text-gray-400 mb-4">
+            {preset === "custom"
+              ? `${customFrom} to ${customTo}`
+              : preset === "daily"
+              ? `Today (${today})`
+              : preset === "weekly"
+              ? "Last 7 days"
+              : "Last 30 days"}
+          </p>
         )}
-      </section>
+
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <SummaryCard
+            label="Revenue"
+            value={summary ? formatPeso(summary.revenue) : "—"}
+          />
+          <SummaryCard
+            label="Profit"
+            value={summary ? formatPeso(summary.profit) : "—"}
+          />
+          <SummaryCard
+            label="Units Sold"
+            value={summary ? String(summary.unitsSold) : "—"}
+          />
+          <SummaryCard
+            label="Transactions"
+            value={summary ? String(summary.saleCount) : "—"}
+          />
+        </div>
+
+        {/* Top products table */}
+        <section className="bg-white rounded-xl border border-gray-200 p-5 mt-6">
+          <h2 className="text-base font-semibold text-gray-800 mb-4">Top Products</h2>
+          {topProducts === undefined ? (
+            <p className="text-sm text-gray-400">Loading…</p>
+          ) : topProducts.length === 0 ? (
+            <p className="text-sm text-gray-500">No sales in this period.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                      #
+                    </th>
+                    <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                      Product
+                    </th>
+                    <th className="text-right py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                      Units Sold
+                    </th>
+                    <th className="text-right py-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+                      Revenue
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {topProducts.map((p, i) => (
+                    <tr key={p.productId} className="hover:bg-gray-50">
+                      <td className="py-2 pr-4 text-gray-400 tabular-nums">{i + 1}</td>
+                      <td className="py-2 pr-4 font-medium text-gray-900">{p.name}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
+                        {p.unitsSold}
+                      </td>
+                      <td className="py-2 text-right tabular-nums font-semibold text-gray-900">
+                        {formatPeso(p.revenue)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

@@ -48,3 +48,10 @@ body {
   }
   .screen-only { display: none !important; }
 }
+
+/* ── Report / Inventory print styles ── */
+@media print {
+  body.printing-report * { visibility: hidden; }
+  body.printing-report .report-print, body.printing-report .report-print * { visibility: visible; }
+  body.printing-report .report-print { position: absolute; top: 0; left: 0; width: 100%; }
+}
