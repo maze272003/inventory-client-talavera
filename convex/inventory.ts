@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
-import { requireRole, requireUser } from "./lib/auth";
+import { requireRole } from "./lib/auth";
 
 export const stockIn = mutation({
   args: {
@@ -57,7 +57,7 @@ export const ledgerForProduct = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    await requireRole(ctx, "admin");
     return await ctx.db
       .query("inventoryLedger")
       .withIndex("by_product", (q) => q.eq("productId", args.productId))
