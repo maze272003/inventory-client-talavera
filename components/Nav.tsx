@@ -12,6 +12,8 @@ const allLinks = [
   { href: "/receipts", label: "Receipts", adminOnly: false },
   { href: "/products", label: "Products", adminOnly: true },
   { href: "/inventory", label: "Inventory", adminOnly: true },
+  { href: "/inventory/import", label: "Import Invoice", adminOnly: true },
+  { href: "/inventory/purchases", label: "Purchases", adminOnly: true },
   { href: "/reports", label: "Reports", adminOnly: true },
 ];
 
