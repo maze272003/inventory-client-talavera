@@ -35,6 +35,20 @@ test("create product writes opening ledger and is found by sku", async () => {
   const found = await admin.query(api.products.getBySku, { sku: "111" });
   expect(found?._id).toEqual(id);
   expect(found?.stockQty).toEqual(5);
+
+  // Assert opening ledger row was written correctly
+  const ledgerRows = await t.run(async (ctx) => {
+    return await ctx.db
+      .query("inventoryLedger")
+      .withIndex("by_product", (q) => q.eq("productId", id))
+      .collect();
+  });
+  expect(ledgerRows).toHaveLength(1);
+  const row = ledgerRows[0];
+  expect(row.type).toBe("stock_in");
+  expect(row.quantityDelta).toBe(5);
+  expect(row.balanceAfter).toBe(5);
+  expect(row.unitCost).toBe(10);
 });
 
 // Extra test (a): cashier calling create is rejected

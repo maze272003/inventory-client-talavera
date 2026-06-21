@@ -34,12 +34,12 @@ export const create = mutation({
 export const update = mutation({
   args: {
     id: v.id("products"),
-    name: v.optional(v.string()),
-    sku: v.optional(v.string()),
-    category: v.optional(v.string()),
-    costPrice: v.optional(v.number()),
-    sellPrice: v.optional(v.number()),
-    reorderThreshold: v.optional(v.number()),
+    name: v.string(),
+    sku: v.string(),
+    category: v.string(),
+    costPrice: v.number(),
+    sellPrice: v.number(),
+    reorderThreshold: v.number(),
   },
   handler: async (ctx, args) => {
     await requireRole(ctx, "admin");
