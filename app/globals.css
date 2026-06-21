@@ -24,3 +24,25 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ── Receipt print styles ── */
+:root {
+  --receipt-width: 80mm;
+}
+
+.receipt-58 {
+  --receipt-width: 58mm;
+}
+
+@media print {
+  body > * { display: none !important; }
+  .receipt-print {
+    display: block !important;
+    width: var(--receipt-width);
+    max-width: var(--receipt-width);
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px;
+    line-height: 1.4;
+    margin: 0 auto;
+  }
+}
