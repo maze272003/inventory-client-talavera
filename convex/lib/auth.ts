@@ -26,13 +26,16 @@ export async function requireUser(ctx: QueryCtx | MutationCtx) {
   return { userId, profile };
 }
 
+// Role hierarchy: admin (2) outranks cashier (1). Higher rank satisfies lower-rank requirements.
+const ROLE_RANK = { cashier: 1, admin: 2 } as const;
+
 export async function requireRole(
   ctx: QueryCtx | MutationCtx,
   role: "admin" | "cashier",
 ) {
   const { userId, profile } = await requireUser(ctx);
-  if (role === "admin" && profile.role !== "admin") {
-    throw new Error("Admin access required");
+  if (ROLE_RANK[profile.role] < ROLE_RANK[role]) {
+    throw new Error(`Requires ${role} access`);
   }
   return { userId, profile };
 }
