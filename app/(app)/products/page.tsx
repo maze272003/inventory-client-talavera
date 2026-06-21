@@ -168,7 +168,8 @@ export default function ProductsPage() {
             </button>
             <button
               onClick={handlePrint}
-              className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
+              disabled={!exportReady}
+              className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Print / PDF
             </button>
