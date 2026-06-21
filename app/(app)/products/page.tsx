@@ -12,11 +12,14 @@ type ProductDoc = {
   name: string;
   sku: string;
   category: string;
+  model?: string;
   costPrice: number;
   sellPrice: number;
   stockQty: number;
   reorderThreshold: number;
   isActive: boolean;
+  imageId?: Id<"_storage">;
+  imageUrl?: string | null;
 };
 
 export default function ProductsPage() {
@@ -134,6 +137,9 @@ export default function ProductsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
+                <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-12">
+                  Photo
+                </th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Name
                 </th>
@@ -166,13 +172,13 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-gray-100">
               {status === "LoadingFirstPage" ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-10 text-gray-400 text-sm">
+                  <td colSpan={10} className="text-center py-10 text-gray-400 text-sm">
                     Loading...
                   </td>
                 </tr>
               ) : results.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-10 text-gray-400 text-sm">
+                  <td colSpan={10} className="text-center py-10 text-gray-400 text-sm">
                     No products found.
                   </td>
                 </tr>
@@ -182,8 +188,38 @@ export default function ProductsPage() {
                   const margin = product.sellPrice - product.costPrice;
                   return (
                     <tr key={product._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {product.name}
+                      {/* Thumbnail */}
+                      <td className="px-3 py-2">
+                        <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+                          {product.imageUrl ? (
+                            <img
+                              src={product.imageUrl}
+                              alt={product.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <svg
+                              className="w-5 h-5 text-gray-300"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={1.5}
+                                d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9H5"
+                              />
+                            </svg>
+                          )}
+                        </div>
+                      </td>
+                      {/* Name + model */}
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900">{product.name}</span>
+                        {product.model && (
+                          <p className="text-xs text-gray-400 mt-0.5">{product.model}</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500 font-mono text-xs">
                         {product.sku}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -10,11 +10,14 @@ type ProductDoc = {
   name: string;
   sku: string;
   category: string;
+  model?: string;
   costPrice: number;
   sellPrice: number;
   stockQty: number;
   reorderThreshold: number;
   isActive: boolean;
+  imageId?: Id<"_storage">;
+  imageUrl?: string | null;
 };
 
 type Props = {
@@ -26,10 +29,12 @@ export default function ProductForm({ product, onClose }: Props) {
   const isEdit = !!product;
   const createProduct = useMutation(api.products.create);
   const updateProduct = useMutation(api.products.update);
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
 
   const [name, setName] = useState(product?.name ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
   const [category, setCategory] = useState(product?.category ?? "");
+  const [model, setModel] = useState(product?.model ?? "");
   const [costPrice, setCostPrice] = useState(
     product ? String(product.costPrice) : ""
   );
@@ -42,6 +47,43 @@ export default function ProductForm({ product, onClose }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  // Image state: the selected File and the object URL created from it
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+
+  // Revoke previous object URL when it changes (or on unmount)
+  useEffect(() => {
+    return () => {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [objectUrl]);
+
+  // Preview: newly selected file's object URL > existing imageUrl > null
+  const previewUrl: string | null = objectUrl ?? product?.imageUrl ?? null;
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    setSelectedFile(file);
+    // Revoke old object URL before creating a new one
+    setObjectUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  async function uploadImage(file: File): Promise<Id<"_storage">> {
+    const url = await generateUploadUrl();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    if (!res.ok) throw new Error("Image upload failed");
+    const { storageId } = await res.json();
+    return storageId as Id<"_storage">;
+  }
 
   function validate(): string | null {
     if (!name.trim()) return "Name is required.";
@@ -73,8 +115,23 @@ export default function ProductForm({ product, onClose }: Props) {
     setError(null);
     setPending(true);
     try {
+      // Upload image if a new file was selected
+      let imageId: Id<"_storage"> | undefined;
+      if (selectedFile) {
+        setUploading(true);
+        try {
+          imageId = await uploadImage(selectedFile);
+        } finally {
+          setUploading(false);
+        }
+      } else if (isEdit && product.imageId) {
+        // Keep the existing imageId in edit mode
+        imageId = product.imageId;
+      }
+
       if (isEdit) {
-        await updateProduct({
+        // Build args conditionally — only include imageId/model when present
+        const updateArgs: Parameters<typeof updateProduct>[0] = {
           id: product._id,
           name: name.trim(),
           sku: sku.trim(),
@@ -82,9 +139,12 @@ export default function ProductForm({ product, onClose }: Props) {
           costPrice: parseFloat(costPrice),
           sellPrice: parseFloat(sellPrice),
           reorderThreshold: parseInt(reorderThreshold, 10),
-        });
+        };
+        if (model.trim()) updateArgs.model = model.trim();
+        if (imageId) updateArgs.imageId = imageId;
+        await updateProduct(updateArgs);
       } else {
-        await createProduct({
+        const createArgs: Parameters<typeof createProduct>[0] = {
           name: name.trim(),
           sku: sku.trim(),
           category: category.trim(),
@@ -92,7 +152,10 @@ export default function ProductForm({ product, onClose }: Props) {
           sellPrice: parseFloat(sellPrice),
           stockQty: parseInt(stockQty || "0", 10),
           reorderThreshold: parseInt(reorderThreshold, 10),
-        });
+        };
+        if (model.trim()) createArgs.model = model.trim();
+        if (imageId) createArgs.imageId = imageId;
+        await createProduct(createArgs);
       }
       onClose();
     } catch (err: unknown) {
@@ -102,9 +165,11 @@ export default function ProductForm({ product, onClose }: Props) {
     }
   }
 
+  const isDisabled = pending || uploading;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           {isEdit ? "Edit Product" : "Add Product"}
         </h2>
@@ -144,6 +209,18 @@ export default function ProductForm({ product, onClose }: Props) {
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g. Tiles"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Model
+              </label>
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g. Honda CB500F 2023"
               />
             </div>
             <div>
@@ -204,6 +281,50 @@ export default function ProductForm({ product, onClose }: Props) {
                 placeholder="0"
               />
             </div>
+
+            {/* Image upload */}
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Product Photo
+              </label>
+              <div className="flex items-center gap-4">
+                {/* Preview */}
+                <div className="flex-shrink-0 w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="Product preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <svg
+                      className="w-6 h-6 text-gray-300"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9H5"
+                      />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    PNG, JPG, WEBP accepted
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {error && (
@@ -222,10 +343,10 @@ export default function ProductForm({ product, onClose }: Props) {
             </button>
             <button
               type="submit"
-              disabled={pending}
+              disabled={isDisabled}
               className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {pending ? "Saving..." : isEdit ? "Save Changes" : "Add Product"}
+              {uploading ? "Uploading..." : pending ? "Saving..." : isEdit ? "Save Changes" : "Add Product"}
             </button>
           </div>
         </form>
