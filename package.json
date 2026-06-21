@@ -1,0 +1,41 @@
+{
+  "name": "inventory-talavera",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:frontend dev:backend",
+    "dev:frontend": "next dev",
+    "dev:backend": "convex dev",
+    "predev": "convex dev --until-success && convex dashboard",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ignore-pattern \"convex/_generated/**\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed:auth": "node scripts/seed-auth-users.mjs",
+    "seed:fresh": "npx convex run --push databaseMaintenance:resetWithMasterSeed \"{\\\"confirm\\\":\\\"RESET_DATABASE\\\"}\"",
+    "typecheck": "tsc --noEmit",
+    "typecheck:convex": "tsc --noEmit -p convex/tsconfig.json",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "convex": "^1.36.1",
+    "next": "16.2.4",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@convex-dev/eslint-plugin": "^2.0.0",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^24.12.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "16.2.4",
+    "prettier": "^3.8.3",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.3"
+  }
+}
