@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, MutationCtx } from "./_generated/server";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { requireUser } from "./lib/auth";
 
@@ -27,19 +27,25 @@ export const createSale = mutation({
     const { userId } = await requireUser(ctx);
     if (args.items.length === 0) throw new Error("Cart is empty");
 
+    // Aggregate duplicate productIds so each product is validated and written once
+    const merged = new Map<Id<"products">, number>();
+    for (const item of args.items) {
+      if (item.quantity <= 0) throw new Error("Quantity must be positive");
+      merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.quantity);
+    }
+
     const lines: Array<{ product: Doc<"products">; quantity: number; lineTotal: number }> = [];
     let total = 0;
 
-    for (const item of args.items) {
-      if (item.quantity <= 0) throw new Error("Quantity must be positive");
-      const product = await ctx.db.get("products", item.productId);
+    for (const [productId, quantity] of merged.entries()) {
+      const product = await ctx.db.get("products", productId);
       if (!product || !product.isActive) throw new Error("Product unavailable");
-      if (product.stockQty < item.quantity) {
+      if (product.stockQty < quantity) {
         throw new Error(`Insufficient stock for ${product.name}`);
       }
-      const lineTotal = product.sellPrice * item.quantity;
+      const lineTotal = product.sellPrice * quantity;
       total += lineTotal;
-      lines.push({ product, quantity: item.quantity, lineTotal });
+      lines.push({ product, quantity, lineTotal });
     }
 
     if (args.cashTendered < total) throw new Error("Insufficient cash tendered");

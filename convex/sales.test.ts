@@ -87,6 +87,53 @@ test("getSale returns sale with correct nameSnapshot, quantity, and lineTotal", 
   expect(item.lineTotal).toEqual(28);
 });
 
+// Duplicate-product aggregation: combined demand exceeds stock → reject
+test("rejects oversell when same product appears twice in cart", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Widget", sku: "ov1", category: "Tools",
+    costPrice: 5, sellPrice: 10, stockQty: 5, reorderThreshold: 1,
+  });
+  await expect(
+    admin.mutation(api.sales.createSale, {
+      items: [
+        { productId: pid, quantity: 3 },
+        { productId: pid, quantity: 4 },
+      ],
+      cashTendered: 100,
+    }),
+  ).rejects.toThrow();
+});
+
+// Duplicate-product aggregation: combined lines merge into one saleItem with correct totals
+test("merges duplicate cart lines correctly", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Widget", sku: "mg1", category: "Tools",
+    costPrice: 5, sellPrice: 10, stockQty: 10, reorderThreshold: 1,
+  });
+  const res = await admin.mutation(api.sales.createSale, {
+    items: [
+      { productId: pid, quantity: 2 },
+      { productId: pid, quantity: 3 },
+    ],
+    cashTendered: 100,
+  });
+  // itemCount should be total units = 5
+  const detail = await admin.query(api.sales.getSale, { saleId: res.saleId });
+  expect(detail).not.toBeNull();
+  expect(detail!.sale.itemCount).toEqual(5);
+  // Exactly one saleItem for this product with merged quantity
+  const items = detail!.items.filter((i) => i.productId === pid);
+  expect(items).toHaveLength(1);
+  expect(items[0].quantity).toEqual(5);
+  // Stock deducted by 5 (10 - 5 = 5)
+  const p = await admin.query(api.products.getBySku, { sku: "mg1" });
+  expect(p?.stockQty).toEqual(5);
+});
+
 // Extra (c): inventoryLedger gets a "sale" row with negative quantityDelta and correct balanceAfter
 test("createSale writes sale-type ledger row with negative quantityDelta and correct balanceAfter", async () => {
   const t = convexTest(schema, modules);
