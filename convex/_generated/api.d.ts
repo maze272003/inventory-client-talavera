@@ -10,10 +10,12 @@
 
 import type * as auth from "../auth.js";
 import type * as databaseMaintenance from "../databaseMaintenance.js";
+import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as products from "../products.js";
+import type * as purchases from "../purchases.js";
 import type * as reports from "../reports.js";
 import type * as sales from "../sales.js";
 import type * as seed from "../seed.js";
@@ -28,10 +30,12 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   databaseMaintenance: typeof databaseMaintenance;
+  files: typeof files;
   http: typeof http;
   inventory: typeof inventory;
   "lib/auth": typeof lib_auth;
   products: typeof products;
+  purchases: typeof purchases;
   reports: typeof reports;
   sales: typeof sales;
   seed: typeof seed;
