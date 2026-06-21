@@ -1,13 +1,21 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { requireRole, requireUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
+
+async function withImageUrl(ctx: QueryCtx, product: Doc<"products">) {
+  const imageUrl = product.imageId ? await ctx.storage.getUrl(product.imageId) : null;
+  return { ...product, imageUrl };
+}
 
 export const create = mutation({
   args: {
     name: v.string(),
     sku: v.string(),
     category: v.string(),
+    model: v.optional(v.string()),
+    imageId: v.optional(v.id("_storage")),
     costPrice: v.number(),
     sellPrice: v.number(),
     stockQty: v.number(),
@@ -37,6 +45,8 @@ export const update = mutation({
     name: v.string(),
     sku: v.string(),
     category: v.string(),
+    model: v.optional(v.string()),
+    imageId: v.optional(v.id("_storage")),
     costPrice: v.number(),
     sellPrice: v.number(),
     reorderThreshold: v.number(),
@@ -65,8 +75,9 @@ export const list = query({
   },
   handler: async (ctx, args) => {
     await requireUser(ctx);
+    let result;
     if (args.search && args.search.trim() !== "") {
-      return await ctx.db
+      result = await ctx.db
         .query("products")
         .withSearchIndex("search_name", (q) =>
           args.activeOnly
@@ -74,15 +85,16 @@ export const list = query({
             : q.search("name", args.search!),
         )
         .paginate(args.paginationOpts);
-    }
-    if (args.category) {
-      return await ctx.db
+    } else if (args.category) {
+      result = await ctx.db
         .query("products")
         .withIndex("by_category", (q) => q.eq("category", args.category!))
         .order("desc")
         .paginate(args.paginationOpts);
+    } else {
+      result = await ctx.db.query("products").order("desc").paginate(args.paginationOpts);
     }
-    return await ctx.db.query("products").order("desc").paginate(args.paginationOpts);
+    return { ...result, page: await Promise.all(result.page.map((p) => withImageUrl(ctx, p))) };
   },
 });
 
@@ -90,10 +102,20 @@ export const getBySku = query({
   args: { sku: v.string() },
   handler: async (ctx, args) => {
     await requireUser(ctx);
-    return await ctx.db
+    const product = await ctx.db
       .query("products")
       .withIndex("by_sku", (q) => q.eq("sku", args.sku))
       .unique();
+    return product ? await withImageUrl(ctx, product) : null;
+  },
+});
+
+export const get = query({
+  args: { id: v.id("products") },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+    const product = await ctx.db.get("products", args.id);
+    return product ? await withImageUrl(ctx, product) : null;
   },
 });
 

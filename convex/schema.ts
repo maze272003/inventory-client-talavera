@@ -22,6 +22,8 @@ export default defineSchema({
     name: v.string(),
     sku: v.string(),
     category: v.string(),
+    model: v.optional(v.string()),
+    imageId: v.optional(v.id("_storage")),
     costPrice: v.number(),
     sellPrice: v.number(),
     stockQty: v.number(),
@@ -41,6 +43,7 @@ export default defineSchema({
     unitCost: v.optional(v.number()),
     reason: v.optional(v.string()),
     saleId: v.optional(v.id("sales")),
+    purchaseId: v.optional(v.id("purchases")),
     userId: v.id("users"),
   })
     .index("by_product", ["productId"])
@@ -72,4 +75,14 @@ export default defineSchema({
     name: v.string(),
     value: v.number(),
   }).index("by_name", ["name"]),
+
+  purchases: defineTable({
+    supplierName: v.string(),
+    referenceNumber: v.optional(v.string()),
+    purchaseDate: v.number(),
+    fileId: v.id("_storage"),
+    total: v.number(),
+    itemCount: v.number(),
+    userId: v.id("users"),
+  }).index("by_supplier", ["supplierName"]),
 });
