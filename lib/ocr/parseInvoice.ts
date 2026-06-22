@@ -68,23 +68,62 @@ function nearestCol(x: number, anchors: Record<ColKey, number>): ColKey {
   return best;
 }
 
-function detectHeaderFields(rows: OcrWord[][]): { supplierName?: string; referenceNumber?: string } {
+const MONTHS: Record<string, number> = {
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+  july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+/** Parse a date out of free text into YYYY-MM-DD. Handles "June 1, 2026",
+ * "2026-06-01", and "06/01/2026" (month/day/year). Returns undefined if none. */
+function parseDateString(s: string): string | undefined {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  let m = s.match(/([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+  if (m) {
+    const mon = MONTHS[m[1].toLowerCase()];
+    if (mon) return `${m[3]}-${pad(mon)}-${pad(Number(m[2]))}`;
+  }
+  m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(Number(m[2]))}-${pad(Number(m[3]))}`;
+  m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return `${m[3]}-${pad(Number(m[1]))}-${pad(Number(m[2]))}`;
+  return undefined;
+}
+
+// Header metadata lines may arrive as one text run ("Customer: SAN PEDRO")
+// from a PDF text layer, or as separate OCR words on the same row. Joining the
+// row's words handles both, then we match by label.
+function detectHeaderFields(rows: OcrWord[][]): {
+  supplierName?: string;
+  referenceNumber?: string;
+  supplierAddress?: string;
+  purchaseDate?: string;
+} {
   let supplierName: string | undefined;
   let referenceNumber: string | undefined;
+  let supplierAddress: string | undefined;
+  let purchaseDate: string | undefined;
+  const clean = (s: string) => s.trim().replace(/\s+/g, " ") || undefined;
+
   for (const row of rows) {
-    for (let i = 0; i < row.length; i++) {
-      const label = row[i].text.toLowerCase().replace(/[^a-z]/g, "");
-      const rest = row.slice(i + 1).map((w) => w.text);
-      if ((label === "customer" || label === "supplier") && !supplierName) {
-        supplierName = rest.slice(0, 3).join(" ").trim() || undefined;
-      }
-      if ((label === "number" || label === "no" || label === "invoice") && !referenceNumber) {
-        const num = rest.map((t) => t.replace(/[^0-9]/g, "")).find((t) => t.length >= 3);
-        if (num) referenceNumber = num;
-      }
+    const text = row.map((w) => w.text).join(" ");
+    let m: RegExpMatchArray | null;
+    if (!supplierName && (m = text.match(/(?:customer|supplier)\s*:?\s*(.+)/i))) {
+      supplierName = clean(m[1]);
+    }
+    if (!supplierAddress && (m = text.match(/address\s*:?\s*(.+)/i))) {
+      supplierAddress = clean(m[1]);
+    }
+    if (
+      !referenceNumber &&
+      (m = text.match(/(?:quotation\s*)?(?:no|number|invoice|ref(?:erence)?)\b\.?\s*:?\s*([A-Za-z0-9][A-Za-z0-9-]*)/i))
+    ) {
+      referenceNumber = m[1];
+    }
+    if (!purchaseDate && (m = text.match(/date\s*:?\s*(.+)/i))) {
+      purchaseDate = parseDateString(m[1]);
     }
   }
-  return { supplierName, referenceNumber };
+  return { supplierName, referenceNumber, supplierAddress, purchaseDate };
 }
 
 function parseWithoutHeader(rows: OcrWord[][]): ParsedLine[] {
@@ -151,9 +190,9 @@ function parseWithoutHeader(rows: OcrWord[][]): ParsedLine[] {
 export function parseInvoice(words: OcrWord[]): ParsedInvoice {
   const rows = groupRows(words);
   const header = findHeader(rows);
-  const { supplierName, referenceNumber } = detectHeaderFields(rows);
+  const meta = detectHeaderFields(rows);
   if (!header) {
-    return { supplierName, referenceNumber, lines: parseWithoutHeader(rows) };
+    return { ...meta, lines: parseWithoutHeader(rows) };
   }
 
   const anchors = header.anchors;
@@ -203,5 +242,5 @@ export function parseInvoice(words: OcrWord[]): ParsedInvoice {
     // A continuation with no current product (stray pre-table text) is ignored.
   }
   pushCurrent();
-  return { supplierName, referenceNumber, lines };
+  return { ...meta, lines };
 }

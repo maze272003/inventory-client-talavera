@@ -9,6 +9,7 @@ import PurchaseLineRow, {
   PurchaseLineDraft,
   emptyDraft,
   isDraftValid,
+  lineTotal,
 } from "@/components/PurchaseLineRow";
 import type { ParsedInvoice } from "@/lib/ocr/types";
 import { formatPeso } from "@/lib/format";
@@ -71,6 +72,7 @@ export default function ImportPage() {
 
   // Header fields
   const [supplierName, setSupplierName] = useState("");
+  const [supplierAddress, setSupplierAddress] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(todayString());
 
@@ -153,8 +155,11 @@ export default function ImportPage() {
   function applyParsed(parsed: ParsedInvoice) {
     if (parsed.supplierName && supplierName.trim() === "")
       setSupplierName(parsed.supplierName);
+    if (parsed.supplierAddress && supplierAddress.trim() === "")
+      setSupplierAddress(parsed.supplierAddress);
     if (parsed.referenceNumber && referenceNumber.trim() === "")
       setReferenceNumber(parsed.referenceNumber);
+    if (parsed.purchaseDate) setPurchaseDate(parsed.purchaseDate);
     const newDrafts: PurchaseLineDraft[] = parsed.lines.map((l) => ({
       ...emptyDraft(),
       mode: "new" as const,
@@ -181,11 +186,14 @@ export default function ImportPage() {
   }
 
   const validDrafts = drafts.filter(isDraftValid);
-  const runningTotal = validDrafts.reduce(
-    (sum, d) => sum + Number(d.unitCost) * Number(d.quantity),
-    0,
-  );
-  const totalUnits = validDrafts.reduce((sum, d) => sum + Number(d.quantity), 0);
+  // Totals reflect every line that has a quantity and a unit cost — even before
+  // its Category/Sell Price are filled — so the grand total matches the sum of
+  // the per-line "Total due" values shown on each row.
+  const runningTotal = drafts.reduce((sum, d) => sum + lineTotal(d), 0);
+  const totalUnits = drafts.reduce((sum, d) => {
+    const q = Number(d.quantity);
+    return sum + (Number.isFinite(q) && q > 0 ? q : 0);
+  }, 0);
 
   const canImport =
     storageId !== null &&
@@ -203,6 +211,7 @@ export default function ImportPage() {
       const result = await createPurchase({
         fileId: storageId,
         supplierName: supplierName.trim(),
+        supplierAddress: supplierAddress.trim() !== "" ? supplierAddress.trim() : undefined,
         referenceNumber: referenceNumber.trim() !== "" ? referenceNumber.trim() : undefined,
         purchaseDate: new Date(purchaseDate + "T00:00:00").getTime(),
         lines,
@@ -228,6 +237,7 @@ export default function ImportPage() {
     });
     setStorageId(null);
     setSupplierName("");
+    setSupplierAddress("");
     setReferenceNumber("");
     setPurchaseDate(todayString());
     setDrafts([emptyDraft()]);
@@ -375,6 +385,18 @@ export default function ImportPage() {
                 value={supplierName}
                 onChange={(e) => setSupplierName(e.target.value)}
                 placeholder="Supplier"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Address
+              </label>
+              <input
+                type="text"
+                value={supplierAddress}
+                onChange={(e) => setSupplierAddress(e.target.value)}
+                placeholder="Optional"
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

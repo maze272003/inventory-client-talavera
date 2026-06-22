@@ -22,6 +22,7 @@ export const createPurchase = mutation({
   args: {
     fileId: v.id("_storage"),
     supplierName: v.string(),
+    supplierAddress: v.optional(v.string()),
     referenceNumber: v.optional(v.string()),
     purchaseDate: v.number(),
     lines: v.array(lineValidator),
@@ -37,6 +38,7 @@ export const createPurchase = mutation({
     // First insert the purchase header so ledger rows can reference it.
     const purchaseId = await ctx.db.insert("purchases", {
       supplierName: args.supplierName,
+      supplierAddress: args.supplierAddress,
       referenceNumber: args.referenceNumber,
       purchaseDate: args.purchaseDate,
       fileId: args.fileId,

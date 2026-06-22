@@ -4,6 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { formatPeso } from "@/lib/format";
+
+/** Per-line total due = quantity x unit cost; 0 when either is missing/invalid. */
+export function lineTotal(d: PurchaseLineDraft): number {
+  const q = Number(d.quantity);
+  const c = Number(d.unitCost);
+  if (!Number.isFinite(q) || !Number.isFinite(c) || q <= 0 || c < 0) return 0;
+  return q * c;
+}
 
 export type PurchaseLineDraft = {
   id: string;
@@ -297,6 +306,12 @@ export default function PurchaseLineRow({ index, draft, onChange, onRemove }: Pr
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
+      </div>
+
+      {/* Per-line total due = quantity x unit cost */}
+      <div className="mt-2 flex items-center justify-end gap-2 text-sm">
+        <span className="text-gray-500">Total due:</span>
+        <span className="font-semibold text-gray-900">{formatPeso(lineTotal(draft))}</span>
       </div>
     </div>
   );

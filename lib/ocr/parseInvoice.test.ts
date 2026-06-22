@@ -126,4 +126,22 @@ describe("parseInvoice", () => {
     expect(result.supplierName).toContain("SAN");
     expect(result.referenceNumber).toBe("508238");
   });
+
+  it("detects supplier, address, reference, and date from single-line text-layer runs", () => {
+    // The PDF text layer emits each metadata line as ONE run, e.g.
+    // "Customer: SAN PEDRO" rather than separate words.
+    const words: OcrWord[] = [
+      w("Customer: SAN PEDRO", 90, 20),
+      w("Address: TALAVERA", 90, 40),
+      w("Quotation No.: 508238", 90, 60),
+      w("Date: June 1, 2026 1:03 PM", 90, 80),
+      ...HEADER,
+      w("1", 50, 140), w("CHAIN", 480, 140), w("100.00", 760, 140),
+    ];
+    const result = parseInvoice(words);
+    expect(result.supplierName).toBe("SAN PEDRO");
+    expect(result.supplierAddress).toBe("TALAVERA");
+    expect(result.referenceNumber).toBe("508238");
+    expect(result.purchaseDate).toBe("2026-06-01");
+  });
 });

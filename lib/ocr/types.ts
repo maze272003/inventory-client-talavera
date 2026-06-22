@@ -12,5 +12,8 @@ export type ParsedLine = {
 export type ParsedInvoice = {
   supplierName?: string;
   referenceNumber?: string;
+  supplierAddress?: string;
+  /** Purchase date as a YYYY-MM-DD string (for a date input), if detected. */
+  purchaseDate?: string;
   lines: ParsedLine[];
 };

@@ -79,6 +79,7 @@ export default defineSchema({
 
   purchases: defineTable({
     supplierName: v.string(),
+    supplierAddress: v.optional(v.string()),
     referenceNumber: v.optional(v.string()),
     purchaseDate: v.number(),
     fileId: v.id("_storage"),
