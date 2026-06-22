@@ -6,6 +6,19 @@ import { api } from "@/convex/_generated/api";
 import { formatPeso } from "@/lib/format";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import DateRangePicker from "@/components/DateRangePicker";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  EmptyState,
+  Icon,
+  PageHeader,
+  ResponsiveTable,
+  SegmentedControl,
+  Skeleton,
+  useToast,
+} from "@/components/ui";
 
 type Preset = "daily" | "weekly" | "monthly" | "custom";
 
@@ -49,21 +62,29 @@ function presetRange(preset: Preset): { startMs: number; endMs: number } {
 interface SummaryCardProps {
   label: string;
   value: string;
+  loading?: boolean;
 }
 
-function SummaryCard({ label, value }: SummaryCardProps) {
+function SummaryCard({ label, value, loading }: SummaryCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col gap-1">
-      <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-        {label}
-      </span>
-      <span className="text-2xl font-bold text-gray-900 tabular-nums">{value}</span>
-    </div>
+    <Card>
+      <CardBody className="flex flex-col gap-1">
+        <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">
+          {label}
+        </span>
+        {loading ? (
+          <Skeleton height={32} width="70%" />
+        ) : (
+          <span className="text-2xl font-bold text-text figure-nums">{value}</span>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
 export default function ReportsPage() {
   const currentUser = useQuery(api.users.currentUser);
+  const { success } = useToast();
 
   const [preset, setPreset] = useState<Preset>("daily");
   const [customFrom, setCustomFrom] = useState<string>("");
@@ -95,26 +116,45 @@ export default function ReportsPage() {
   );
 
   // Admin guard
-  if (currentUser === undefined) return null;
-
-  if (currentUser?.role !== "admin") {
+  if (currentUser === undefined) {
     return (
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Reports</h1>
-        <p className="text-red-600">Admins only.</p>
+      <div className="space-y-6">
+        <PageHeader title="Reports" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i}>
+              <CardBody className="flex flex-col gap-2">
+                <Skeleton height={12} width="50%" />
+                <Skeleton height={32} width="70%" />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }
 
-  const presets: { id: Preset; label: string }[] = [
-    { id: "daily", label: "Today" },
-    { id: "weekly", label: "Last 7 days" },
-    { id: "monthly", label: "Last 30 days" },
-    { id: "custom", label: "Custom" },
+  if (currentUser?.role !== "admin") {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Reports" />
+        <EmptyState
+          icon="info"
+          title="Admins only"
+          description="You don't have permission to view reports."
+        />
+      </div>
+    );
+  }
+
+  const presets: { value: Preset; label: string }[] = [
+    { value: "daily", label: "Today" },
+    { value: "weekly", label: "Last 7 days" },
+    { value: "monthly", label: "Last 30 days" },
+    { value: "custom", label: "Custom" },
   ];
 
-  const customRangeReady =
-    preset === "custom" && customFrom && customTo;
+  const customRangeReady = preset === "custom" && customFrom && customTo;
 
   const today = toDateString(new Date());
 
@@ -167,6 +207,7 @@ export default function ReportsPage() {
     const csv = `${summarySection}\r\n\r\n${productsSection}`;
 
     downloadCsv(`report-${rangeLabel}.csv`, csv);
+    success("Export ready", `report-${rangeLabel}.csv downloaded`);
   }
 
   function handlePrint() {
@@ -179,72 +220,71 @@ export default function ReportsPage() {
     window.print();
   }
 
+  const summaryLoading = summary === undefined;
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        {/* Export controls */}
-        <div className="flex gap-2 screen-only">
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={!summary}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Excel (CSV)
-          </button>
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-600 transition-colors"
-          >
-            Print / PDF
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Reports"
+        actions={
+          <div className="flex gap-2 screen-only">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!summary}
+              onClick={handleExportCsv}
+              leftIcon={<Icon name="download" />}
+            >
+              Excel (CSV)
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handlePrint}
+              leftIcon={<Icon name="printer" />}
+            >
+              Print / PDF
+            </Button>
+          </div>
+        }
+      />
 
       {/* Preset toggle */}
-      <div className="flex flex-wrap gap-2 items-center screen-only">
-        {presets.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => setPreset(p.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              preset === p.id
-                ? "bg-blue-600 text-white"
-                : "bg-white border border-gray-300 text-gray-700 hover:border-blue-400"
-            }`}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="screen-only">
+        <SegmentedControl<Preset>
+          ariaLabel="Report date range"
+          value={preset}
+          onChange={setPreset}
+          options={presets}
+        />
       </div>
 
       {/* Custom date range picker */}
       {preset === "custom" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 screen-only">
-          <DateRangePicker
-            from={customFrom}
-            to={customTo}
-            onFromChange={setCustomFrom}
-            onToChange={(v) => {
-              setCustomTo(v);
-            }}
-          />
-          {!customRangeReady && (
-            <p className="text-xs text-amber-600 mt-2">
-              Select both a start and end date to view the report.
-            </p>
-          )}
-        </div>
+        <Card className="screen-only">
+          <CardBody>
+            <DateRangePicker
+              from={customFrom}
+              to={customTo}
+              onFromChange={setCustomFrom}
+              onToChange={(v) => {
+                setCustomTo(v);
+              }}
+            />
+            {!customRangeReady && (
+              <p className="mt-3 text-xs text-warning-fg">
+                Select both a start and end date to view the report.
+              </p>
+            )}
+          </CardBody>
+        </Card>
       )}
 
       {/* Printable report container */}
-      <div className="report-print">
+      <div className="report-print space-y-6">
         {/* Range label */}
         {(preset !== "custom" || customRangeReady) && (
-          <p className="text-xs text-gray-400 mb-4">
+          <p className="text-xs text-text-muted">
             {preset === "custom"
               ? `${customFrom} to ${customTo}`
               : preset === "daily"
@@ -256,69 +296,87 @@ export default function ReportsPage() {
         )}
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryCard
             label="Revenue"
+            loading={summaryLoading}
             value={summary ? formatPeso(summary.revenue) : "—"}
           />
           <SummaryCard
             label="Profit"
+            loading={summaryLoading}
             value={summary ? formatPeso(summary.profit) : "—"}
           />
           <SummaryCard
             label="Units Sold"
+            loading={summaryLoading}
             value={summary ? String(summary.unitsSold) : "—"}
           />
           <SummaryCard
             label="Transactions"
+            loading={summaryLoading}
             value={summary ? String(summary.saleCount) : "—"}
           />
         </div>
 
         {/* Top products table */}
-        <section className="bg-white rounded-xl border border-gray-200 p-5 mt-6">
-          <h2 className="text-base font-semibold text-gray-800 mb-4">Top Products</h2>
-          {topProducts === undefined ? (
-            <p className="text-sm text-gray-400">Loading…</p>
-          ) : topProducts.length === 0 ? (
-            <p className="text-sm text-gray-500">No sales in this period.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                      #
-                    </th>
-                    <th className="text-left py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                      Product
-                    </th>
-                    <th className="text-right py-2 pr-4 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                      Units Sold
-                    </th>
-                    <th className="text-right py-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
-                      Revenue
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {topProducts.map((p, i) => (
-                    <tr key={p.productId} className="hover:bg-gray-50">
-                      <td className="py-2 pr-4 text-gray-400 tabular-nums">{i + 1}</td>
-                      <td className="py-2 pr-4 font-medium text-gray-900">{p.name}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums text-gray-700">
-                        {p.unitsSold}
-                      </td>
-                      <td className="py-2 text-right tabular-nums font-semibold text-gray-900">
-                        {formatPeso(p.revenue)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+        <Card>
+          <CardHeader>
+            <h2 className="text-base font-semibold text-text">Top Products</h2>
+          </CardHeader>
+          <CardBody>
+            {topProducts === undefined ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} height={20} />
+                ))}
+              </div>
+            ) : (
+              <ResponsiveTable
+                caption="Top products by revenue"
+                rows={topProducts}
+                rowKey={(p) => p.productId}
+                columns={[
+                  {
+                    key: "rank",
+                    header: "#",
+                    align: "left",
+                    className: "text-text-muted tabular-nums",
+                    cell: (_p, i) => i + 1,
+                  },
+                  {
+                    key: "name",
+                    header: "Product",
+                    align: "left",
+                    className: "font-medium text-text",
+                    cell: (p) => p.name,
+                  },
+                  {
+                    key: "unitsSold",
+                    header: "Units Sold",
+                    align: "right",
+                    className: "tabular-nums text-text-muted",
+                    cell: (p) => p.unitsSold,
+                  },
+                  {
+                    key: "revenue",
+                    header: "Revenue",
+                    align: "right",
+                    className: "tabular-nums font-semibold text-text",
+                    cell: (p) => formatPeso(p.revenue),
+                  },
+                ]}
+                empty={
+                  <EmptyState
+                    icon="bar-chart"
+                    title="No sales in this period"
+                    description="Try a different date range."
+                  />
+                }
+              />
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

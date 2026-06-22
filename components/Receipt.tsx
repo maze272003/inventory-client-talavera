@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso, formatDate } from "@/lib/format";
+import { Button, Skeleton, Icon } from "@/components/ui";
 
 type Props = {
   saleId: Id<"sales">;
@@ -17,15 +18,30 @@ export default function Receipt({ saleId }: Props) {
 
   if (data === undefined) {
     return (
-      <div className="flex items-center justify-center p-8 text-gray-500 text-sm">
-        Loading receipt...
+      <div className="space-y-3">
+        <div className="flex gap-2 print:hidden">
+          <Skeleton height={44} width={140} />
+          <Skeleton height={44} width={140} />
+        </div>
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <div className="mx-auto max-w-xs space-y-3">
+            <Skeleton height={20} width="60%" className="mx-auto" />
+            <Skeleton height={12} width="40%" className="mx-auto" />
+            <div className="space-y-2 pt-3">
+              <Skeleton height={14} />
+              <Skeleton height={14} />
+              <Skeleton height={14} />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   if (data === null) {
     return (
-      <div className="flex items-center justify-center p-8 text-red-500 text-sm">
+      <div className="flex items-center justify-center gap-2 rounded-lg border border-danger-fg/30 bg-danger-bg p-8 text-sm text-danger-fg">
+        <Icon name="alert-triangle" size={18} />
         Receipt not found.
       </div>
     );
@@ -42,53 +58,45 @@ export default function Receipt({ saleId }: Props) {
   return (
     <div className="space-y-3">
       {/* Controls (hidden on print) */}
-      <div className="flex gap-2 print:hidden">
-        <button
-          type="button"
-          onClick={handlePrint}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
+      <div className="flex flex-wrap gap-2 print:hidden">
+        <Button onClick={handlePrint} leftIcon={<Icon name="printer" size={18} />}>
           Print Receipt
-        </button>
-        <button
-          type="button"
-          onClick={() => setIs58mm((v) => !v)}
-          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
+        </Button>
+        <Button variant="secondary" onClick={() => setIs58mm((v) => !v)}>
           {is58mm ? "Switch to 80mm" : "Switch to 58mm"}
-        </button>
+        </Button>
       </div>
 
-      {/* Receipt content */}
+      {/* Receipt content — keep print classes (receipt-print / receipt-58 / screen-only) */}
       <div
-        className={`receipt-print bg-white border border-gray-200 rounded-lg p-4 font-mono text-xs${
+        className={`receipt-print mx-auto max-w-sm rounded-lg border border-border bg-surface p-4 font-mono text-xs text-text${
           is58mm ? " receipt-58" : ""
         }`}
       >
         {/* Header */}
-        <div className="text-center mb-3">
-          <p className="font-bold text-base">Talavera Store</p>
-          <p className="text-gray-600">Official Receipt</p>
+        <div className="mb-3 text-center">
+          <p className="text-base font-bold">Talavera Store</p>
+          <p className="text-text-muted">Official Receipt</p>
         </div>
 
-        <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
+        <div className="mb-2 border-t border-dashed border-border pt-2">
           <div className="flex justify-between">
             <span>Receipt #:</span>
-            <span className="font-bold">{sale.receiptNumber}</span>
+            <span className="font-bold tabular-nums">{sale.receiptNumber}</span>
           </div>
           <div className="flex justify-between">
             <span>Date:</span>
-            <span>{formatDate(sale._creationTime)}</span>
+            <span className="tabular-nums">{formatDate(sale._creationTime)}</span>
           </div>
         </div>
 
         {/* Items */}
-        <div className="border-t border-dashed border-gray-400 pt-2 mb-2">
+        <div className="mb-2 border-t border-dashed border-border pt-2">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-300">
-                <th className="text-left font-semibold pb-1">Item</th>
-                <th className="text-right font-semibold pb-1">Amt</th>
+              <tr className="border-b border-border">
+                <th className="pb-1 text-left font-semibold">Item</th>
+                <th className="pb-1 text-right font-semibold">Amt</th>
               </tr>
             </thead>
             <tbody>
@@ -105,23 +113,23 @@ export default function Receipt({ saleId }: Props) {
                             alt={item.nameSnapshot}
                             width={40}
                             height={40}
-                            className="w-10 h-10 object-cover rounded"
+                            className="h-10 w-10 rounded object-cover"
                           />
                         ) : (
-                          <span className="w-10 h-10 flex items-center justify-center bg-gray-100 rounded text-gray-400 text-xs">
+                          <span className="flex h-10 w-10 items-center justify-center rounded bg-surface-2 text-xs text-text-muted">
                             —
                           </span>
                         )}
                       </span>
                       <div>
                         <div>{item.nameSnapshot}</div>
-                        <div className="text-gray-500">
+                        <div className="text-text-muted tabular-nums">
                           {item.quantity} × {formatPeso(item.unitSellPrice)}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="text-right py-0.5 align-top tabular-nums">
+                  <td className="py-0.5 text-right align-top tabular-nums">
                     {formatPeso(item.lineTotal)}
                   </td>
                 </tr>
@@ -131,7 +139,7 @@ export default function Receipt({ saleId }: Props) {
         </div>
 
         {/* Totals */}
-        <div className="border-t border-dashed border-gray-400 pt-2 space-y-1">
+        <div className="space-y-1 border-t border-dashed border-border pt-2">
           <div className="flex justify-between font-bold">
             <span>TOTAL</span>
             <span className="tabular-nums">{formatPeso(sale.total)}</span>
@@ -147,7 +155,7 @@ export default function Receipt({ saleId }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-dashed border-gray-400 mt-3 pt-2 text-center text-gray-500">
+        <div className="mt-3 border-t border-dashed border-border pt-2 text-center text-text-muted">
           <p>Thank you for your purchase!</p>
         </div>
       </div>

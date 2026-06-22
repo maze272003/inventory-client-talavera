@@ -4,6 +4,7 @@ import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { CartItem } from "@/components/ProductSearch";
 import { formatPeso } from "@/lib/format";
+import { Button, Badge, Skeleton, EmptyState, Icon } from "@/components/ui";
 
 type Props = {
   search: string;
@@ -19,23 +20,45 @@ export default function ProductGrid({ search, onAdd }: Props) {
 
   if (status === "LoadingFirstPage") {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-gray-400">
-        Loading products…
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface"
+          >
+            <Skeleton className="aspect-square w-full rounded-none" />
+            <div className="flex flex-col gap-2 p-2">
+              <Skeleton height={12} width="90%" />
+              <Skeleton height={14} width="40%" />
+              <Skeleton height={16} width="55%" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (results.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-sm text-gray-400">
-        {search.trim() ? `No products found for "${search.trim()}"` : "No products available."}
-      </div>
+      <EmptyState
+        icon="package"
+        title={
+          search.trim()
+            ? `No products found for "${search.trim()}"`
+            : "No products available"
+        }
+        description={
+          search.trim()
+            ? "Try a different name or scan a barcode above."
+            : "Add products in the inventory section to sell them here."
+        }
+      />
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {results.map((product) => {
           const outOfStock = product.stockQty <= 0;
           const lowStock = product.stockQty > 0 && product.stockQty <= 5;
@@ -55,67 +78,50 @@ export default function ProductGrid({ search, onAdd }: Props) {
                   quantity: 1,
                 })
               }
+              aria-label={`Add ${product.name} to cart, ${formatPeso(product.sellPrice)}${
+                outOfStock ? ", out of stock" : ""
+              }`}
               className={[
-                "flex flex-col rounded-xl border text-left transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 overflow-hidden",
+                "flex flex-col overflow-hidden rounded-xl border text-left transition-all",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 outOfStock
-                  ? "border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed"
-                  : "border-gray-200 bg-white hover:border-blue-400 hover:shadow-md active:scale-95 cursor-pointer",
+                  ? "cursor-not-allowed border-border bg-surface-2 opacity-50"
+                  : "cursor-pointer border-border bg-surface hover:border-primary hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100",
               ].join(" ")}
             >
               {/* Product image */}
-              <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden">
+              <div className="flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-2">
                 {product.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={product.imageUrl}
                     alt={product.name}
-                    className="w-full h-full object-cover"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center w-full h-full text-gray-300">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-10 w-10"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={1}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
+                  <Icon name="package" size={36} className="text-text-muted opacity-50" />
                 )}
               </div>
 
               {/* Product info */}
-              <div className="p-2 flex flex-col gap-1 flex-1">
-                <p className="text-xs font-semibold text-gray-900 leading-tight line-clamp-2">
+              <div className="flex flex-1 flex-col gap-1 p-2">
+                <p className="line-clamp-2 text-xs font-semibold leading-tight text-text">
                   {product.name}
                 </p>
                 {product.model && (
-                  <p className="text-xs text-gray-400 truncate">{product.model}</p>
+                  <p className="truncate text-xs text-text-muted">{product.model}</p>
                 )}
-                <p className="text-sm font-bold text-blue-700 tabular-nums mt-auto">
+                <p className="mt-auto text-sm font-bold tabular-nums text-primary">
                   {formatPeso(product.sellPrice)}
                 </p>
 
                 {/* Stock badge */}
                 {outOfStock ? (
-                  <span className="inline-block rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                    Out of stock
-                  </span>
+                  <Badge variant="danger">Out of stock</Badge>
                 ) : lowStock ? (
-                  <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                    Stock: {product.stockQty}
-                  </span>
+                  <Badge variant="warning">Stock: {product.stockQty}</Badge>
                 ) : (
-                  <span className="inline-block rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                    Stock: {product.stockQty}
-                  </span>
+                  <Badge variant="success">Stock: {product.stockQty}</Badge>
                 )}
               </div>
             </button>
@@ -125,13 +131,16 @@ export default function ProductGrid({ search, onAdd }: Props) {
 
       {status === "CanLoadMore" && (
         <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={() => loadMore(24)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
+          <Button variant="secondary" onClick={() => loadMore(24)}>
             Load more
-          </button>
+          </Button>
+        </div>
+      )}
+      {status === "LoadingMore" && (
+        <div className="flex justify-center">
+          <Button variant="secondary" loading disabled>
+            Loading
+          </Button>
         </div>
       )}
     </div>

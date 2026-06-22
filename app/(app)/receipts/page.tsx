@@ -1,12 +1,37 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatPeso, formatDate } from "@/lib/format";
+import {
+  PageHeader,
+  Card,
+  CardBody,
+  Field,
+  Input,
+  Button,
+  Badge,
+  Skeleton,
+  SkeletonText,
+  EmptyState,
+  ResponsiveTable,
+  Icon,
+  type Column,
+} from "@/components/ui";
+
+type ReceiptRow = {
+  _id: string;
+  _creationTime: number;
+  receiptNumber: number;
+  itemCount: number;
+  cashierName: string;
+  total: number;
+};
 
 export default function ReceiptsPage() {
+  const router = useRouter();
   const [searchInput, setSearchInput] = useState("");
 
   // Parse a positive integer from the search input, or undefined to list all
@@ -21,75 +46,146 @@ export default function ReceiptsPage() {
     { initialNumItems: 20 }
   );
 
+  const isLoadingFirstPage = status === "LoadingFirstPage";
+  const isEmpty = results.length === 0 && status === "Exhausted";
+
+  const columns: Column<ReceiptRow>[] = [
+    {
+      key: "receiptNumber",
+      header: "Receipt",
+      cell: (sale) => (
+        <span className="font-semibold text-primary tabular-nums">
+          #{sale.receiptNumber}
+        </span>
+      ),
+    },
+    {
+      key: "date",
+      header: "Date",
+      cell: (sale) => (
+        <span className="text-text-muted">{formatDate(sale._creationTime)}</span>
+      ),
+    },
+    {
+      key: "cashier",
+      header: "Cashier",
+      cell: (sale) => <span className="text-text">{sale.cashierName}</span>,
+    },
+    {
+      key: "items",
+      header: "Items",
+      align: "center",
+      cell: (sale) => (
+        <Badge variant="neutral">
+          {sale.itemCount} {sale.itemCount === 1 ? "item" : "items"}
+        </Badge>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      align: "right",
+      cell: (sale) => (
+        <span className="font-semibold text-text figure-nums">
+          {formatPeso(sale.total)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Receipts</h1>
+      <PageHeader
+        title="Receipts"
+        subtitle="Browse and search past sales"
+      />
 
       {/* Search */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        <label
-          htmlFor="receipt-search"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Search by Receipt Number
-        </label>
-        <input
-          id="receipt-search"
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Enter receipt number…"
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
-      {/* Card grid */}
-      {results.length === 0 && status === "Exhausted" ? (
-        <p className="p-6 text-sm text-gray-500 text-center">No receipts found.</p>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {results.map((sale) => (
-            <Link
-              key={sale._id}
-              href={`/receipts/${sale._id}`}
-              className="block bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-blue-300 transition-all"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-lg font-bold text-blue-600">
-                  #{sale.receiptNumber}
-                </span>
-                <span className="text-xs text-gray-400 bg-gray-100 rounded-full px-2 py-0.5">
-                  {sale.itemCount} {sale.itemCount === 1 ? "item" : "items"}
-                </span>
-              </div>
-              <div className="text-sm text-gray-500 mb-3">
-                {formatDate(sale._creationTime)}
-              </div>
-              <div className="text-xs text-gray-400 mb-3">
-                Cashier: {sale.cashierName}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-gray-400">Total</span>
-                <span className="text-base font-semibold text-gray-900 tabular-nums">
-                  {formatPeso(sale.total)}
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* Load more */}
-      {status === "CanLoadMore" && (
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={() => loadMore(20)}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+      <Card className="mb-6">
+        <CardBody>
+          <Field
+            label="Search by receipt number"
+            hint="Enter a receipt number to filter, or leave blank to list all."
+            className="max-w-xs"
           >
-            Load more
-          </button>
-        </div>
+            <Input
+              type="text"
+              inputMode="numeric"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Enter receipt number…"
+              aria-label="Search by receipt number"
+            />
+          </Field>
+        </CardBody>
+      </Card>
+
+      {/* List */}
+      {isLoadingFirstPage ? (
+        <Card>
+          <CardBody>
+            <div className="space-y-4" aria-busy="true" aria-live="polite">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between gap-4 border-b border-border py-row last:border-0"
+                >
+                  <Skeleton height={18} width="20%" />
+                  <Skeleton height={14} width="25%" />
+                  <Skeleton height={14} width="20%" />
+                  <Skeleton height={18} width="15%" />
+                </div>
+              ))}
+              <span className="sr-only">Loading receipts…</span>
+            </div>
+          </CardBody>
+        </Card>
+      ) : isEmpty ? (
+        <EmptyState
+          icon="receipt"
+          title="No receipts found"
+          description={
+            searchNum !== undefined
+              ? `No receipt matches #${searchNum}. Try a different number.`
+              : "Completed sales will appear here once you ring up an order."
+          }
+          action={
+            searchNum !== undefined ? (
+              <Button variant="secondary" onClick={() => setSearchInput("")}>
+                Clear search
+              </Button>
+            ) : undefined
+          }
+        />
+      ) : (
+        <>
+          <ResponsiveTable<ReceiptRow>
+            caption="Receipts"
+            rows={results as ReceiptRow[]}
+            rowKey={(sale) => sale._id}
+            columns={columns}
+            onRowClick={(sale) => router.push(`/receipts/${sale._id}`)}
+          />
+
+          {/* Load more */}
+          {status === "CanLoadMore" && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                variant="secondary"
+                onClick={() => loadMore(20)}
+                leftIcon={<Icon name="chevron-down" size={16} />}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
+          {status === "LoadingMore" && (
+            <div className="mt-6" aria-busy="true" aria-live="polite">
+              <SkeletonText lines={2} />
+              <span className="sr-only">Loading more receipts…</span>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

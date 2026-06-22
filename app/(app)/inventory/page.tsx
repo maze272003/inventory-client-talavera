@@ -7,6 +7,19 @@ import { Id } from "@/convex/_generated/dataModel";
 import StockInDialog from "@/components/StockInDialog";
 import AdjustDialog from "@/components/AdjustDialog";
 import LedgerDrawer from "@/components/LedgerDrawer";
+import {
+  PageHeader,
+  Card,
+  CardBody,
+  Input,
+  Button,
+  Badge,
+  ResponsiveTable,
+  EmptyState,
+  Skeleton,
+  SkeletonText,
+  Spinner,
+} from "@/components/ui";
 
 type ProductDoc = {
   _id: Id<"products">;
@@ -53,159 +66,168 @@ function ProductPickerAndActions() {
     setDialog(null);
   }
 
+  const isLoadingFirst = status === "LoadingFirstPage";
+
   return (
     <div>
-      <h2 className="text-base font-semibold text-gray-800 mb-3">Products</h2>
+      <h2 className="text-base font-semibold text-text mb-3">Products</h2>
 
-      <div className="mb-3">
-        <input
+      <div className="mb-3 max-w-sm">
+        <Input
           type="text"
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Search products..."
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Search products"
         />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Product
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  SKU
-                </th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Stock
-                </th>
-                <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {status === "LoadingFirstPage" ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-10 text-gray-400 text-sm">
-                    Loading...
-                  </td>
-                </tr>
-              ) : results.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="text-center py-10 text-gray-400 text-sm">
-                    No products found.
-                  </td>
-                </tr>
-              ) : (
-                results.map((product) => {
-                  const isLowStock = product.stockQty <= product.reorderThreshold;
+      <Card className="overflow-hidden">
+        {isLoadingFirst ? (
+          <CardBody>
+            <div className="space-y-row" aria-busy="true" aria-label="Loading products">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-cell">
+                  <div className="flex-1">
+                    <Skeleton height={16} width="40%" />
+                    <div className="mt-2">
+                      <Skeleton height={12} width="25%" />
+                    </div>
+                  </div>
+                  <Skeleton height={28} width={120} />
+                </div>
+              ))}
+            </div>
+          </CardBody>
+        ) : (
+          <ResponsiveTable<ProductDoc>
+            caption="Products and stock actions"
+            rows={results as ProductDoc[]}
+            rowKey={(p) => p._id}
+            columns={[
+              {
+                key: "name",
+                header: "Product",
+                cell: (p) => (
+                  <span className="font-medium text-text">
+                    {p.name}
+                    {!p.isActive && (
+                      <span className="ml-2 text-xs text-text-muted">(inactive)</span>
+                    )}
+                  </span>
+                ),
+              },
+              {
+                key: "sku",
+                header: "SKU",
+                cell: (p) => (
+                  <span className="font-mono text-xs text-text-muted">{p.sku}</span>
+                ),
+              },
+              {
+                key: "stock",
+                header: "Stock",
+                align: "right",
+                cell: (p) => {
+                  const isLowStock = p.stockQty <= p.reorderThreshold;
                   return (
-                    <tr
-                      key={product._id}
-                      className="hover:bg-gray-50"
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900">
-                        {product.name}
-                        {!product.isActive && (
-                          <span className="ml-2 text-xs text-gray-400">(inactive)</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                        {product.sku}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span
-                          className={`font-medium ${
-                            isLowStock ? "text-red-700" : "text-gray-700"
-                          }`}
-                        >
-                          {product.stockQty}
-                          {isLowStock && (
-                            <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
-                              Low
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center gap-2">
-                          <button
-                            onClick={() =>
-                              setDialog({ type: "stockIn", product: product as ProductDoc })
-                            }
-                            className="text-xs px-2 py-1 rounded bg-green-50 hover:bg-green-100 text-green-700 transition-colors font-medium"
-                          >
-                            Stock In
-                          </button>
-                          <button
-                            onClick={() =>
-                              setDialog({ type: "adjust", product: product as ProductDoc })
-                            }
-                            className="text-xs px-2 py-1 rounded bg-orange-50 hover:bg-orange-100 text-orange-700 transition-colors font-medium"
-                          >
-                            Adjust
-                          </button>
-                          <button
-                            onClick={() =>
-                              setDialog({ type: "ledger", product: product as ProductDoc })
-                            }
-                            className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors font-medium"
-                          >
-                            Ledger
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <span className="inline-flex items-center gap-2 justify-end">
+                      <span
+                        className={`figure-nums font-medium ${
+                          isLowStock ? "text-danger-fg" : "text-text"
+                        }`}
+                      >
+                        {p.stockQty}
+                      </span>
+                      {isLowStock && <Badge variant="danger">Low</Badge>}
+                    </span>
                   );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                },
+              },
+              {
+                key: "actions",
+                header: "Actions",
+                align: "center",
+                hideLabelOnCard: true,
+                cell: (p) => (
+                  <div className="flex flex-wrap gap-2 md:justify-center">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setDialog({ type: "stockIn", product: p })}
+                    >
+                      Stock In
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setDialog({ type: "adjust", product: p })}
+                    >
+                      Adjust
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setDialog({ type: "ledger", product: p })}
+                    >
+                      Ledger
+                    </Button>
+                  </div>
+                ),
+              },
+            ]}
+            empty={
+              <EmptyState
+                icon="package"
+                title="No products found"
+                description={
+                  search
+                    ? "Try a different search term."
+                    : "No products are available yet."
+                }
+              />
+            }
+          />
+        )}
 
         {status === "CanLoadMore" && (
-          <div className="flex justify-center py-4 border-t border-gray-100">
-            <button
-              onClick={() => loadMore(20)}
-              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
+          <div className="flex justify-center py-row border-t border-border">
+            <Button variant="ghost" onClick={() => loadMore(20)}>
               Load more
-            </button>
+            </Button>
           </div>
         )}
         {status === "LoadingMore" && (
-          <div className="flex justify-center py-4 text-sm text-gray-400 border-t border-gray-100">
-            Loading...
+          <div className="flex justify-center items-center gap-2 py-row text-sm text-text-muted border-t border-border">
+            <Spinner size={16} />
+            Loading more…
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Dialogs */}
-      {dialog?.type === "stockIn" && (
-        <StockInDialog
-          productId={dialog.product._id}
-          productName={dialog.product.name}
-          onClose={closeDialog}
-        />
-      )}
-      {dialog?.type === "adjust" && (
-        <AdjustDialog
-          productId={dialog.product._id}
-          productName={dialog.product.name}
-          currentQty={dialog.product.stockQty}
-          onClose={closeDialog}
-        />
-      )}
-      {dialog?.type === "ledger" && (
-        <LedgerDrawer
-          productId={dialog.product._id}
-          productName={dialog.product.name}
-          onClose={closeDialog}
-        />
-      )}
+      <StockInDialog
+        key={dialog?.type === "stockIn" ? `stockIn-${dialog.product._id}` : "stockIn"}
+        open={dialog?.type === "stockIn"}
+        productId={dialog?.type === "stockIn" ? dialog.product._id : undefined}
+        productName={dialog?.type === "stockIn" ? dialog.product.name : ""}
+        onClose={closeDialog}
+      />
+      <AdjustDialog
+        key={dialog?.type === "adjust" ? `adjust-${dialog.product._id}` : "adjust"}
+        open={dialog?.type === "adjust"}
+        productId={dialog?.type === "adjust" ? dialog.product._id : undefined}
+        productName={dialog?.type === "adjust" ? dialog.product.name : ""}
+        currentQty={dialog?.type === "adjust" ? dialog.product.stockQty : 0}
+        onClose={closeDialog}
+      />
+      <LedgerDrawer
+        key={dialog?.type === "ledger" ? `ledger-${dialog.product._id}` : "ledger"}
+        open={dialog?.type === "ledger"}
+        productId={dialog?.type === "ledger" ? dialog.product._id : undefined}
+        productName={dialog?.type === "ledger" ? dialog.product.name : ""}
+        onClose={closeDialog}
+      />
     </div>
   );
 }
@@ -213,30 +235,47 @@ function ProductPickerAndActions() {
 function LowStockSection() {
   const lowStock = useQuery(api.products.lowStock, {});
 
-  if (!lowStock || lowStock.length === 0) return null;
+  if (lowStock === undefined) {
+    return (
+      <div className="mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Skeleton height={20} width={160} />
+        </div>
+        <Card>
+          <CardBody>
+            <SkeletonText lines={2} />
+          </CardBody>
+        </Card>
+      </div>
+    );
+  }
+
+  if (lowStock.length === 0) return null;
 
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-base font-semibold text-gray-800">Low Stock Alerts</h2>
-        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-          {lowStock.length}
-        </span>
+        <h2 className="text-base font-semibold text-text">Low Stock Alerts</h2>
+        <Badge variant="danger">{lowStock.length}</Badge>
       </div>
-      <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+      <div className="rounded-xl border border-danger-fg/30 bg-danger-bg p-cell">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {lowStock.map((product) => (
             <div
               key={product._id}
-              className="bg-white rounded-lg border border-red-200 px-4 py-3 flex items-center justify-between"
+              className="bg-surface rounded-lg border border-border px-cell py-row flex items-center justify-between gap-3"
             >
-              <div>
-                <p className="text-sm font-medium text-gray-900">{product.name}</p>
-                <p className="text-xs text-gray-500">{product.sku}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-text truncate">{product.name}</p>
+                <p className="text-xs text-text-muted font-mono truncate">{product.sku}</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-red-700">{product.stockQty}</p>
-                <p className="text-xs text-gray-400">threshold: {product.reorderThreshold}</p>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-danger-fg figure-nums">
+                  {product.stockQty}
+                </p>
+                <p className="text-xs text-text-muted">
+                  threshold: <span className="figure-nums">{product.reorderThreshold}</span>
+                </p>
               </div>
             </div>
           ))}
@@ -249,20 +288,42 @@ function LowStockSection() {
 export default function InventoryPage() {
   const currentUser = useQuery(api.users.currentUser);
 
-  if (currentUser === undefined) return null;
+  if (currentUser === undefined) {
+    return (
+      <div>
+        <PageHeader title="Inventory" />
+        <div className="space-y-6">
+          <Card>
+            <CardBody>
+              <SkeletonText lines={2} />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardBody>
+              <SkeletonText lines={6} />
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Inventory</h1>
-        <p className="text-red-600">Admins only.</p>
+        <PageHeader title="Inventory" />
+        <EmptyState
+          icon="info"
+          title="Admins only"
+          description="You do not have permission to view inventory management."
+        />
       </div>
     );
   }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Inventory</h1>
+      <PageHeader title="Inventory" subtitle="Manage stock levels and movements" />
       <LowStockSection />
       <ProductPickerAndActions />
     </div>

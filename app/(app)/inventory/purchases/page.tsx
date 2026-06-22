@@ -5,43 +5,118 @@ import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso, formatDate } from "@/lib/format";
+import {
+  Badge,
+  Button,
+  Card,
+  cn,
+  EmptyState,
+  Icon,
+  PageHeader,
+  ResponsiveTable,
+  Skeleton,
+  SkeletonText,
+} from "@/components/ui";
+
+type PurchaseRow = {
+  _id: Id<"purchases">;
+  supplierName: string;
+  purchaseDate: number;
+  referenceNumber?: string;
+  itemCount: number;
+  total: number;
+  fileUrl?: string | null;
+};
 
 function PurchaseDetails({ purchaseId }: { purchaseId: Id<"purchases"> }) {
   const data = useQuery(api.purchases.getPurchase, { purchaseId });
+
   if (data === undefined) {
-    return <p className="px-4 py-3 text-xs text-gray-400">Loading details...</p>;
+    return (
+      <div className="bg-surface-2 border-t border-border p-cell">
+        <SkeletonText lines={3} />
+      </div>
+    );
   }
   if (data === null) {
-    return <p className="px-4 py-3 text-xs text-gray-400">Details unavailable.</p>;
+    return (
+      <div className="bg-surface-2 border-t border-border px-cell py-row">
+        <p className="text-xs text-text-muted">Details unavailable.</p>
+      </div>
+    );
   }
   if (data.ledgerRows.length === 0) {
-    return <p className="px-4 py-3 text-xs text-gray-400">No ledger rows.</p>;
+    return (
+      <div className="bg-surface-2 border-t border-border p-cell">
+        <EmptyState
+          icon="receipt"
+          title="No ledger rows"
+          description="This purchase has no associated stock movements."
+        />
+      </div>
+    );
   }
+
   return (
-    <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="text-gray-500">
-            <th className="text-left py-1 font-medium">Type</th>
-            <th className="text-right py-1 font-medium">Qty</th>
-            <th className="text-right py-1 font-medium">Unit cost</th>
-            <th className="text-right py-1 font-medium">Balance after</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-200">
-          {data.ledgerRows.map((row) => (
-            <tr key={row._id}>
-              <td className="py-1 text-gray-700">{row.type}</td>
-              <td className="py-1 text-right text-gray-700">{row.quantityDelta}</td>
-              <td className="py-1 text-right text-gray-700">
-                {row.unitCost !== undefined ? formatPeso(row.unitCost) : "—"}
-              </td>
-              <td className="py-1 text-right text-gray-700">{row.balanceAfter}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="bg-surface-2 border-t border-border p-cell">
+      <ResponsiveTable
+        rows={data.ledgerRows}
+        rowKey={(r) => r._id}
+        caption="Stock ledger rows for this purchase"
+        columns={[
+          {
+            key: "type",
+            header: "Type",
+            cell: (r) => <span className="text-text">{r.type}</span>,
+          },
+          {
+            key: "qty",
+            header: "Qty",
+            align: "right",
+            cell: (r) => (
+              <span className="figure-nums text-text">{r.quantityDelta}</span>
+            ),
+          },
+          {
+            key: "unitCost",
+            header: "Unit cost",
+            align: "right",
+            cell: (r) => (
+              <span className="figure-nums text-text">
+                {r.unitCost !== undefined ? formatPeso(r.unitCost) : "—"}
+              </span>
+            ),
+          },
+          {
+            key: "balanceAfter",
+            header: "Balance after",
+            align: "right",
+            cell: (r) => (
+              <span className="figure-nums text-text">{r.balanceAfter}</span>
+            ),
+          },
+        ]}
+      />
     </div>
+  );
+}
+
+function PurchasesSkeleton() {
+  return (
+    <ul className="divide-y divide-border" aria-hidden="true">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <li
+          key={i}
+          className="flex items-center justify-between gap-4 px-cell py-row"
+        >
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton height={16} width="40%" />
+            <Skeleton height={12} width="60%" />
+          </div>
+          <Skeleton height={20} width={80} />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -55,62 +130,115 @@ export default function PurchasesPage() {
     { initialNumItems: 20 },
   );
 
-  if (currentUser === undefined) return null;
-  if (currentUser?.role !== "admin") {
+  if (currentUser === undefined) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Purchases</h1>
-        <p className="text-red-600">Admins only.</p>
+        <PageHeader title="Purchases" />
+        <Card className="mt-6">
+          <PurchasesSkeleton />
+        </Card>
       </div>
     );
   }
 
+  if (currentUser?.role !== "admin") {
+    return (
+      <div>
+        <PageHeader title="Purchases" />
+        <Card className="mt-6">
+          <EmptyState
+            icon="alert-triangle"
+            title="Admins only"
+            description="You do not have permission to view purchase records."
+          />
+        </Card>
+      </div>
+    );
+  }
+
+  const isFirstLoad = status === "LoadingFirstPage";
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Purchases</h1>
+      <PageHeader
+        title="Purchases"
+        subtitle={
+          !isFirstLoad
+            ? `${results.length} purchase${results.length === 1 ? "" : "s"}`
+            : undefined
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {status === "LoadingFirstPage" ? (
-          <p className="text-center py-10 text-gray-400 text-sm">Loading...</p>
+      <Card className="mt-6 overflow-hidden">
+        {isFirstLoad ? (
+          <PurchasesSkeleton />
         ) : results.length === 0 ? (
-          <p className="text-center py-10 text-gray-400 text-sm">No purchases yet.</p>
+          <EmptyState
+            icon="receipt"
+            title="No purchases yet"
+            description="Recorded supplier purchases will appear here."
+          />
         ) : (
-          <ul className="divide-y divide-gray-100">
-            {results.map((p) => {
+          <ul className="divide-y divide-border">
+            {(results as PurchaseRow[]).map((p) => {
               const isOpen = expanded === p._id;
               return (
                 <li key={p._id}>
-                  <div className="flex items-center justify-between px-4 py-3 gap-4">
+                  <div className="flex items-center justify-between gap-4 px-cell py-row">
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{p.supplierName}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="truncate font-medium text-text">
+                        {p.supplierName}
+                      </p>
+                      <p className="text-xs text-text-muted">
                         {formatDate(p.purchaseDate)}
                         {p.referenceNumber ? ` · Ref ${p.referenceNumber}` : ""} ·{" "}
                         {p.itemCount} unit{p.itemCount === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-semibold text-gray-900">{formatPeso(p.total)}</span>
+                    <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                      <Badge variant="neutral" className="figure-nums">
+                        {formatPeso(p.total)}
+                      </Badge>
                       {p.fileUrl && (
                         <a
                           href={p.fileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 transition-colors"
+                          className={cn(
+                            "inline-flex h-9 items-center gap-2 rounded-md border border-transparent px-3 text-sm font-medium text-text transition-colors",
+                            "hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg",
+                          )}
                         >
-                          View PDF
+                          <Icon name="download" size={16} />
+                          PDF
                         </a>
                       )}
-                      <button
-                        type="button"
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => setExpanded(isOpen ? null : p._id)}
-                        className="text-xs px-2 py-1 rounded text-blue-600 hover:bg-blue-50 transition-colors"
+                        aria-expanded={isOpen}
+                        aria-controls={`purchase-details-${p._id}`}
+                        rightIcon={
+                          <Icon
+                            name={isOpen ? "chevron-up" : "chevron-down"}
+                            size={16}
+                          />
+                        }
                       >
                         {isOpen ? "Hide" : "Details"}
-                      </button>
+                      </Button>
                     </div>
                   </div>
-                  {isOpen && <PurchaseDetails purchaseId={p._id} />}
+                  {isOpen && (
+                    <div
+                      id={`purchase-details-${p._id}`}
+                      role="region"
+                      aria-label={`Details for ${p.supplierName}`}
+                    >
+                      <PurchaseDetails purchaseId={p._id} />
+                    </div>
+                  )}
                 </li>
               );
             })}
@@ -118,21 +246,20 @@ export default function PurchasesPage() {
         )}
 
         {status === "CanLoadMore" && (
-          <div className="flex justify-center py-4 border-t border-gray-100">
-            <button
-              onClick={() => loadMore(20)}
-              className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
+          <div className="flex justify-center border-t border-border py-row">
+            <Button variant="secondary" size="sm" onClick={() => loadMore(20)}>
               Load more
-            </button>
+            </Button>
           </div>
         )}
         {status === "LoadingMore" && (
-          <div className="flex justify-center py-4 text-sm text-gray-400 border-t border-gray-100">
-            Loading...
+          <div className="flex justify-center border-t border-border py-row">
+            <Button variant="ghost" size="sm" loading disabled>
+              Loading
+            </Button>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

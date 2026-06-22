@@ -13,6 +13,21 @@ import PurchaseLineRow, {
 } from "@/components/PurchaseLineRow";
 import type { ParsedInvoice } from "@/lib/ocr/types";
 import { formatPeso } from "@/lib/format";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  EmptyState,
+  Field,
+  Icon,
+  Input,
+  PageHeader,
+  Skeleton,
+  SkeletonText,
+  Spinner,
+  useToast,
+} from "@/components/ui";
 
 type CreateLine =
   | { existingProductId: Id<"products">; quantity: number; unitCost: number }
@@ -57,6 +72,7 @@ export default function ImportPage() {
   const currentUser = useQuery(api.users.currentUser);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const createPurchase = useMutation(api.purchases.createPurchase);
+  const { success, error: toastError } = useToast();
 
   // File / upload state
   const [storageId, setStorageId] = useState<Id<"_storage"> | null>(null);
@@ -91,12 +107,38 @@ export default function ImportPage() {
     };
   }, [objectUrl]);
 
-  if (currentUser === undefined) return null;
+  if (currentUser === undefined) {
+    return (
+      <div>
+        <PageHeader title="Import Invoice" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardBody className="space-y-3">
+              <Skeleton height={20} width="40%" />
+              <Skeleton height={40} />
+              <Skeleton height="60vh" />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardBody className="space-y-3">
+              <SkeletonText lines={4} />
+              <Skeleton height={80} />
+              <Skeleton height={80} />
+            </CardBody>
+          </Card>
+        </div>
+      </div>
+    );
+  }
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Import Invoice</h1>
-        <p className="text-red-600">Admins only.</p>
+        <PageHeader title="Import Invoice" />
+        <EmptyState
+          icon="alert-triangle"
+          title="Admins only"
+          description="You do not have permission to import invoices."
+        />
       </div>
     );
   }
@@ -221,10 +263,16 @@ export default function ImportPage() {
         productsCreated: result.productsCreated,
         total: result.total,
       });
+      success(
+        "Import complete",
+        `${result.linesImported} line${result.linesImported === 1 ? "" : "s"} imported.`,
+      );
       resetForm();
     } catch (err: unknown) {
       // Do NOT clear the form on error.
-      setSubmitError(err instanceof Error ? err.message : "Import failed.");
+      const message = err instanceof Error ? err.message : "Import failed.";
+      setSubmitError(message);
+      toastError("Import failed", message);
     } finally {
       setSubmitting(false);
     }
@@ -258,226 +306,281 @@ export default function ImportPage() {
   if (summary) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Import Invoice</h1>
-        <div className="max-w-md rounded-xl border border-green-200 bg-green-50 p-6">
-          <h2 className="text-lg font-semibold text-green-800 mb-3">Import complete</h2>
-          <dl className="space-y-1 text-sm text-gray-700">
-            <div className="flex justify-between">
-              <dt>Lines imported</dt>
-              <dd className="font-medium">{summary.linesImported}</dd>
+        <PageHeader title="Import Invoice" />
+        <Card className="max-w-md">
+          <CardHeader className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success-bg text-success-fg">
+              <Icon name="check" />
+            </span>
+            <span className="text-lg font-semibold text-text">Import complete</span>
+          </CardHeader>
+          <CardBody>
+            <dl className="space-y-2 text-sm text-text">
+              <div className="flex justify-between gap-4">
+                <dt className="text-text-muted">Lines imported</dt>
+                <dd className="font-medium tabular-nums">{summary.linesImported}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-text-muted">Products created</dt>
+                <dd className="font-medium tabular-nums">{summary.productsCreated}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-text-muted">Total cost</dt>
+                <dd className="font-medium tabular-nums">{formatPeso(summary.total)}</dd>
+              </div>
+            </dl>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button onClick={newImport} leftIcon={<Icon name="plus" />}>
+                New import
+              </Button>
+              <Link
+                href="/inventory/purchases"
+                className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-4 text-sm font-medium text-text shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              >
+                View purchases
+              </Link>
             </div>
-            <div className="flex justify-between">
-              <dt>Products created</dt>
-              <dd className="font-medium">{summary.productsCreated}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Total cost</dt>
-              <dd className="font-medium">{formatPeso(summary.total)}</dd>
-            </div>
-          </dl>
-          <div className="mt-5 flex gap-3">
-            <button
-              onClick={newImport}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
-            >
-              New import
-            </button>
-            <Link
-              href="/inventory/purchases"
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              View purchases
-            </Link>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
     );
   }
 
+  const pct = Math.round(ocrFraction * 100);
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Import Invoice</h1>
+      <PageHeader
+        title="Import Invoice"
+        subtitle="Upload a supplier invoice PDF, review the extracted lines, then import."
+      />
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Left: upload + PDF viewer */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Invoice PDF <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-          />
-          {uploading && <p className="mt-2 text-xs text-gray-500">Uploading...</p>}
-          {storageId && !uploading && (
-            <p className="mt-2 text-xs text-green-700">Upload complete.</p>
-          )}
-          {uploadError && (
-            <p className="mt-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              {uploadError}
-            </p>
-          )}
+        <Card>
+          <CardBody className="space-y-3">
+            <Field label="Invoice PDF" required>
+              <input
+                type="file"
+                accept="application/pdf"
+                onChange={handleFileChange}
+                className="block w-full cursor-pointer text-sm text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-fg hover:file:bg-primary-hover"
+              />
+            </Field>
 
-          {/* OCR auto-extract status */}
-          {ocrStage !== null && (
-            <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
-                <span>Reading invoice: {ocrStage}</span>
-                <span>{Math.round(ocrFraction * 100)}%</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
-                <div
-                  className="h-full bg-blue-600 transition-all"
-                  style={{ width: `${Math.round(ocrFraction * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {ocrError && (
-            <p className="mt-2 text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-              Auto-extract failed: {ocrError}. You can still fill in the lines
-              manually below.
-            </p>
-          )}
-
-          {currentFile && (
-            <div className="mt-3 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (currentFile) void runExtraction(currentFile);
-                }}
-                disabled={ocrStage !== null}
-                className="text-sm px-3 py-1.5 rounded-lg font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {ocrStage !== null ? "Extracting..." : "Re-extract"}
-              </button>
-              <p className="text-xs text-gray-500">
-                Review the extracted rows against the document and correct any
-                mistakes before importing.
+            {uploading && (
+              <p className="flex items-center gap-2 text-xs text-text-muted">
+                <Spinner size={14} /> Uploading...
               </p>
-            </div>
-          )}
-
-          <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden">
-            {objectUrl ? (
-              <iframe src={objectUrl} className="w-full h-[70vh]" title="Invoice PDF" />
-            ) : (
-              <div className="flex items-center justify-center h-[70vh] text-sm text-gray-400">
-                Select a PDF to preview it here.
+            )}
+            {storageId && !uploading && (
+              <p className="flex items-center gap-1.5 text-xs text-success-fg">
+                <Icon name="check" /> Upload complete.
+              </p>
+            )}
+            {uploadError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-danger bg-danger-bg px-3 py-2 text-sm text-danger-fg"
+              >
+                <Icon name="alert-triangle" />
+                <span>{uploadError}</span>
               </div>
             )}
-          </div>
-        </div>
+
+            {/* OCR auto-extract status */}
+            {ocrStage !== null && (
+              <div>
+                <div
+                  className="mb-1 flex items-center justify-between text-xs text-text-muted"
+                  aria-live="polite"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Spinner size={12} /> Reading invoice: {ocrStage}
+                  </span>
+                  <span className="tabular-nums">{pct}%</span>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full bg-surface-2"
+                  role="progressbar"
+                  aria-valuenow={pct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Invoice extraction progress"
+                >
+                  <div
+                    className="h-full bg-primary transition-all motion-reduce:transition-none"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {ocrError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-warning bg-warning-bg px-3 py-2 text-sm text-warning-fg"
+              >
+                <Icon name="alert-triangle" />
+                <span>
+                  Auto-extract failed: {ocrError}. You can still fill in the lines
+                  manually below.
+                </span>
+              </div>
+            )}
+
+            {currentFile && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  loading={ocrStage !== null}
+                  leftIcon={ocrStage === null ? <Icon name="refresh" /> : undefined}
+                  onClick={() => {
+                    if (currentFile) void runExtraction(currentFile);
+                  }}
+                >
+                  {ocrStage !== null ? "Extracting..." : "Re-extract"}
+                </Button>
+                <p className="text-xs text-text-muted">
+                  Review the extracted rows against the document and correct any
+                  mistakes before importing.
+                </p>
+              </div>
+            )}
+
+            <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
+              {objectUrl ? (
+                <iframe
+                  src={objectUrl}
+                  className="h-[70vh] w-full"
+                  title="Invoice PDF"
+                />
+              ) : (
+                <div className="flex h-[70vh] items-center justify-center">
+                  <EmptyState
+                    icon="receipt"
+                    title="No invoice selected"
+                    description="Select a PDF to preview it here."
+                  />
+                </div>
+              )}
+            </div>
+          </CardBody>
+        </Card>
 
         {/* Right: header fields + line entry */}
-        <div>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Supplier name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={supplierName}
-                onChange={(e) => setSupplierName(e.target.value)}
-                placeholder="Supplier"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <Card>
+          <CardBody>
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Field label="Supplier name" required>
+                  <Input
+                    type="text"
+                    value={supplierName}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    placeholder="Supplier"
+                  />
+                </Field>
+              </div>
+              <div className="sm:col-span-2">
+                <Field label="Address">
+                  <Input
+                    type="text"
+                    value={supplierAddress}
+                    onChange={(e) => setSupplierAddress(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </Field>
+              </div>
+              <Field label="Reference #">
+                <Input
+                  type="text"
+                  value={referenceNumber}
+                  onChange={(e) => setReferenceNumber(e.target.value)}
+                  placeholder="Optional"
+                />
+              </Field>
+              <Field label="Purchase date" required>
+                <Input
+                  type="date"
+                  value={purchaseDate}
+                  onChange={(e) => setPurchaseDate(e.target.value)}
+                />
+              </Field>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Address
-              </label>
-              <input
-                type="text"
-                value={supplierAddress}
-                onChange={(e) => setSupplierAddress(e.target.value)}
-                placeholder="Optional"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reference #
-              </label>
-              <input
-                type="text"
-                value={referenceNumber}
-                onChange={(e) => setReferenceNumber(e.target.value)}
-                placeholder="Optional"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Purchase date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={purchaseDate}
-                onChange={(e) => setPurchaseDate(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
 
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-base font-semibold text-gray-800">Line items</h2>
-            <button
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-base font-semibold text-text">Line items</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                leftIcon={<Icon name="plus" />}
+                onClick={addLine}
+              >
+                Add line
+              </Button>
+            </div>
+
+            {drafts.some((d) => d.mode === "new" && !isDraftValid(d)) && (
+              <div className="mb-3 flex items-start gap-2 rounded-md border border-warning bg-warning-bg px-3 py-2 text-xs text-warning-fg">
+                <Icon name="alert-triangle" />
+                <span>
+                  Extracted rows need a Category and Sell Price before they can be
+                  imported.
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {drafts.map((draft, index) => (
+                <PurchaseLineRow
+                  key={draft.id}
+                  index={index}
+                  draft={draft}
+                  onChange={updateDraft}
+                  onRemove={removeLine}
+                />
+              ))}
+            </div>
+
+            {/* Totals */}
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-2 px-cell py-row text-sm">
+              <span className="text-text-muted">
+                <span className="tabular-nums">{validDrafts.length}</span> valid line
+                {validDrafts.length === 1 ? "" : "s"} ·{" "}
+                <span className="tabular-nums">{totalUnits}</span> unit
+                {totalUnits === 1 ? "" : "s"}
+              </span>
+              <span className="font-semibold text-text tabular-nums">
+                {formatPeso(runningTotal)}
+              </span>
+            </div>
+
+            {submitError && (
+              <div
+                role="alert"
+                className="mt-3 flex items-start gap-2 rounded-md border border-danger bg-danger-bg px-3 py-2 text-sm text-danger-fg"
+              >
+                <Icon name="alert-triangle" />
+                <span>{submitError}</span>
+              </div>
+            )}
+
+            <Button
               type="button"
-              onClick={addLine}
-              className="text-sm px-3 py-1.5 rounded-lg font-medium text-blue-600 hover:bg-blue-50 transition-colors"
+              fullWidth
+              className="mt-4"
+              loading={submitting}
+              disabled={!canImport}
+              onClick={handleImport}
             >
-              + Add line
-            </button>
-          </div>
-
-          {drafts.some((d) => d.mode === "new" && !isDraftValid(d)) && (
-            <p className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Extracted rows need a Category and Sell Price before they can be imported.
-            </p>
-          )}
-
-          <div className="space-y-3">
-            {drafts.map((draft, index) => (
-              <PurchaseLineRow
-                key={draft.id}
-                index={index}
-                draft={draft}
-                onChange={updateDraft}
-                onRemove={removeLine}
-              />
-            ))}
-          </div>
-
-          {/* Totals */}
-          <div className="mt-4 flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-sm">
-            <span className="text-gray-600">
-              {validDrafts.length} valid line{validDrafts.length === 1 ? "" : "s"} ·{" "}
-              {totalUnits} unit{totalUnits === 1 ? "" : "s"}
-            </span>
-            <span className="font-semibold text-gray-900">{formatPeso(runningTotal)}</span>
-          </div>
-
-          {submitError && (
-            <p className="mt-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              {submitError}
-            </p>
-          )}
-
-          <button
-            type="button"
-            onClick={handleImport}
-            disabled={!canImport}
-            className="mt-4 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {submitting ? "Importing..." : "Import"}
-          </button>
-        </div>
+              {submitting ? "Importing..." : "Import"}
+            </Button>
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

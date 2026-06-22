@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -9,6 +9,19 @@ import ProductGrid from "@/components/ProductGrid";
 import Cart from "@/components/Cart";
 import Receipt from "@/components/Receipt";
 import { formatPeso } from "@/lib/format";
+import {
+  PageHeader,
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  Field,
+  Input,
+  Dialog,
+  Icon,
+  Badge,
+  useToast,
+} from "@/components/ui";
 
 export default function PosPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -17,13 +30,18 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gridSearch, setGridSearch] = useState("");
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const createSale = useMutation(api.sales.createSale);
+  const { success, error: toastError } = useToast();
+
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const total = cart.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0);
   const tendered = parseFloat(cashTendered) || 0;
   const change = tendered - total;
   const canComplete = cart.length > 0 && tendered >= total && !isSubmitting;
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function handleAddToCart(item: CartItem) {
     setCart((prev) => {
@@ -45,7 +63,7 @@ export default function PosPage() {
     setError(null);
   }
 
-  async function handleCompleteSale() {
+  const handleCompleteSale = useCallback(async () => {
     if (!canComplete) return;
     setIsSubmitting(true);
     setError(null);
@@ -55,144 +73,274 @@ export default function PosPage() {
         cashTendered: tendered,
       });
       setCompletedSaleId(result.saleId);
+      success("Sale complete", `Change due ${formatPeso(change)}`);
       // Don't clear cart yet — keep visible until "New Sale" is clicked
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      const message =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
+      setError(message);
+      toastError("Sale failed", message);
     } finally {
       setIsSubmitting(false);
     }
-  }
+  }, [canComplete, createSale, cart, tendered, change, success, toastError]);
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      // Don't hijack typing in inputs except for the documented combos.
+      const target = e.target as HTMLElement | null;
+      const inField =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
+      // "?" opens help (only when not typing).
+      if (e.key === "?" && !inField) {
+        e.preventDefault();
+        setHelpOpen(true);
+        return;
+      }
+      // "/" focuses the search box.
+      if (e.key === "/" && !inField) {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
+      // Ctrl/Cmd+Enter completes the sale.
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        if (completedSaleId === null) {
+          void handleCompleteSale();
+        }
+        return;
+      }
+      // Ctrl/Cmd+N starts a new sale.
+      if ((e.ctrlKey || e.metaKey) && (e.key === "n" || e.key === "N")) {
+        e.preventDefault();
+        handleNewSale();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [completedSaleId, handleCompleteSale]);
+
+  const helpDialog = (
+    <Dialog
+      open={helpOpen}
+      onClose={() => setHelpOpen(false)}
+      title="Keyboard shortcuts"
+      size="sm"
+    >
+      <dl className="space-y-2 text-sm">
+        {[
+          { keys: "/", label: "Focus search / scan box" },
+          { keys: "Ctrl / ⌘ + Enter", label: "Complete sale" },
+          { keys: "Ctrl / ⌘ + N", label: "New sale" },
+          { keys: "?", label: "Show this help" },
+        ].map((row) => (
+          <div key={row.keys} className="flex items-center justify-between gap-4">
+            <dt className="order-2">
+              <kbd className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs font-medium text-text">
+                {row.keys}
+              </kbd>
+            </dt>
+            <dd className="order-1 text-text-muted">{row.label}</dd>
+          </div>
+        ))}
+      </dl>
+    </Dialog>
+  );
 
   // ── Receipt view (after successful sale) ──────────────────────────────────
   if (completedSaleId !== null) {
     return (
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Sale Complete</h1>
-          <button
-            type="button"
-            onClick={handleNewSale}
-            className="rounded-lg bg-green-600 px-5 py-2 text-sm font-semibold text-white hover:bg-green-700 transition-colors"
-          >
-            New Sale
-          </button>
-        </div>
+        <PageHeader
+          title="Sale complete"
+          subtitle="Receipt ready to print"
+          actions={
+            <Button
+              variant="primary"
+              onClick={handleNewSale}
+              leftIcon={<Icon name="plus" size={18} />}
+            >
+              New Sale
+            </Button>
+          }
+        />
         <Receipt saleId={completedSaleId} />
+        {helpDialog}
       </div>
     );
   }
 
+  // ── Payment panel (shared between desktop column and mobile sheet) ─────────
+  const paymentPanel = (
+    <div className="space-y-4">
+      {/* Order total */}
+      <div className="flex items-center justify-between border-y border-border py-3">
+        <span className="text-sm text-text-muted">Order Total</span>
+        <span className="text-2xl font-bold tabular-nums text-text">
+          {formatPeso(total)}
+        </span>
+      </div>
+
+      {/* Cash tendered */}
+      <Field label="Cash Tendered (₱)">
+        <Input
+          id="cash-tendered"
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          value={cashTendered}
+          onChange={(e) => setCashTendered(e.target.value)}
+          placeholder="0.00"
+          className="tabular-nums"
+        />
+      </Field>
+
+      {/* Change */}
+      {tendered >= total && tendered > 0 && (
+        <div className="flex items-center justify-between rounded-lg bg-success-bg px-4 py-3">
+          <span className="text-sm font-medium text-success-fg">Change</span>
+          <span className="text-xl font-bold tabular-nums text-success-fg">
+            {formatPeso(change)}
+          </span>
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-lg border border-danger-fg/30 bg-danger-bg px-4 py-3 text-sm text-danger-fg"
+        >
+          <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Complete Sale */}
+      <Button
+        size="lg"
+        fullWidth
+        onClick={handleCompleteSale}
+        disabled={!canComplete}
+        loading={isSubmitting}
+      >
+        {isSubmitting ? "Processing" : "Complete Sale"}
+      </Button>
+
+      {cart.length === 0 && (
+        <p className="text-center text-xs text-text-muted">
+          Add items to the cart to begin.
+        </p>
+      )}
+      {cart.length > 0 && tendered < total && (
+        <p className="text-center text-xs text-warning-fg">
+          Enter cash tendered ≥ {formatPeso(total)} to proceed.
+        </p>
+      )}
+    </div>
+  );
+
   // ── POS view ──────────────────────────────────────────────────────────────
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Point of Sale</h1>
+    <div className="pb-28 xl:pb-0">
+      <PageHeader
+        title="Point of Sale"
+        subtitle={cart.length > 0 ? `${itemCount} item(s) in cart` : "Scan or browse to start a sale"}
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+            leftIcon={<Icon name="info" size={16} />}
+          >
+            Shortcuts
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
         {/* Left + centre: scan box, product grid, cart */}
-        <div className="xl:col-span-2 space-y-4">
+        <div className="space-y-4 xl:col-span-2">
           {/* Scan / SKU lookup */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <ProductSearch onAddToCart={handleAddToCart} />
-          </div>
+          <Card>
+            <CardBody>
+              <ProductSearch ref={searchRef} onAddToCart={handleAddToCart} />
+            </CardBody>
+          </Card>
 
           {/* Browse grid */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <div className="mb-3">
-              <label
-                htmlFor="grid-search"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Browse products
-              </label>
-              <input
-                id="grid-search"
-                type="text"
-                value={gridSearch}
-                onChange={(e) => setGridSearch(e.target.value)}
-                placeholder="Filter by name…"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <ProductGrid search={gridSearch} onAdd={handleAddToCart} />
-          </div>
+          <Card>
+            <CardBody className="space-y-3">
+              <Field label="Browse products">
+                <Input
+                  id="grid-search"
+                  type="text"
+                  value={gridSearch}
+                  onChange={(e) => setGridSearch(e.target.value)}
+                  placeholder="Filter by name…"
+                />
+              </Field>
+              <ProductGrid search={gridSearch} onAdd={handleAddToCart} />
+            </CardBody>
+          </Card>
 
           {/* Cart */}
-          <div className="bg-white rounded-xl border border-gray-200 p-4 min-h-[200px]">
-            <Cart items={cart} onUpdate={setCart} />
-          </div>
+          <Card>
+            <CardBody className="min-h-[200px]">
+              <Cart items={cart} onUpdate={setCart} />
+            </CardBody>
+          </Card>
         </div>
 
-        {/* Right column: payment */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
-          <h2 className="text-base font-semibold text-gray-700">Payment</h2>
-
-          {/* Order total */}
-          <div className="flex justify-between items-center py-3 border-t border-b border-gray-100">
-            <span className="text-sm text-gray-600">Order Total</span>
-            <span className="text-2xl font-bold text-gray-900 tabular-nums">
-              {formatPeso(total)}
-            </span>
-          </div>
-
-          {/* Cash tendered */}
-          <div>
-            <label
-              htmlFor="cash-tendered"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Cash Tendered (₱)
-            </label>
-            <input
-              id="cash-tendered"
-              type="number"
-              min="0"
-              step="0.01"
-              value={cashTendered}
-              onChange={(e) => setCashTendered(e.target.value)}
-              placeholder="0.00"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Change */}
-          {tendered >= total && tendered > 0 && (
-            <div className="flex justify-between items-center bg-green-50 rounded-lg px-4 py-3">
-              <span className="text-sm font-medium text-green-700">Change</span>
-              <span className="text-xl font-bold text-green-700 tabular-nums">
-                {formatPeso(change)}
-              </span>
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {/* Complete Sale */}
-          <button
-            type="button"
-            onClick={handleCompleteSale}
-            disabled={!canComplete}
-            className="w-full rounded-lg bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? "Processing…" : "Complete Sale"}
-          </button>
-
-          {cart.length === 0 && (
-            <p className="text-xs text-center text-gray-400">
-              Add items to the cart to begin.
-            </p>
-          )}
-          {cart.length > 0 && tendered < total && (
-            <p className="text-xs text-center text-amber-600">
-              Enter cash tendered ≥ {formatPeso(total)} to proceed.
-            </p>
-          )}
-        </div>
+        {/* Right column: payment (desktop) */}
+        <Card className="hidden self-start xl:block">
+          <CardHeader>
+            <h2 className="flex items-center gap-2 text-base font-semibold text-text">
+              <Icon name="receipt" size={18} className="text-text-muted" />
+              Payment
+            </h2>
+          </CardHeader>
+          <CardBody>{paymentPanel}</CardBody>
+        </Card>
       </div>
+
+      {/* Mobile/tablet: payment as a sticky bottom sheet */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface shadow-md xl:hidden">
+        <details className="group">
+          <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2">
+              <Icon name="shopping-cart" size={20} className="text-text-muted" />
+              <span className="text-sm font-medium text-text">Payment</span>
+              {cart.length > 0 && (
+                <Badge variant="primary">{itemCount}</Badge>
+              )}
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="text-lg font-bold tabular-nums text-text">
+                {formatPeso(total)}
+              </span>
+              <Icon
+                name="chevron-up"
+                size={18}
+                className="text-text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none"
+              />
+            </span>
+          </summary>
+          <div className="max-h-[60vh] overflow-y-auto border-t border-border px-4 py-4">
+            {paymentPanel}
+          </div>
+        </details>
+      </div>
+
+      {helpDialog}
     </div>
   );
 }

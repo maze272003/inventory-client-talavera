@@ -1,28 +1,187 @@
 @import "tailwindcss";
 
+/* Class-based dark mode (manual toggle), not prefers-color-scheme.
+   Tailwind v4: register the dark variant against the .dark class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ──────────────────────────────────────────────────────────────
+   Design tokens — single source of truth.
+   Light values live on :root; dark overrides live under html.dark.
+   Raw values are defined as CSS custom properties first, then
+   exposed to Tailwind's utility engine via @theme inline so that
+   classes like bg-surface / text-muted / rounded-lg resolve to them.
+   ────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Color — neutral slate base, indigo primary */
+  --color-bg: #f8fafc;          /* slate-50  */
+  --color-surface: #ffffff;     /* cards / panels */
+  --color-surface-2: #f1f5f9;   /* slate-100 — subtle raised / hover */
+  --color-border: #e2e8f0;      /* slate-200 */
+  --color-text: #0f172a;        /* slate-900 */
+  --color-text-muted: #64748b;  /* slate-500 */
+
+  --color-primary: #4f46e5;       /* indigo-600 */
+  --color-primary-hover: #4338ca; /* indigo-700 */
+  --color-primary-fg: #ffffff;
+
+  --color-success: #059669;       /* emerald-600 */
+  --color-success-fg: #ffffff;
+  --color-success-bg: #d1fae5;    /* emerald-100 */
+
+  --color-warning: #d97706;       /* amber-600 */
+  --color-warning-fg: #ffffff;
+  --color-warning-bg: #fef3c7;    /* amber-100 */
+
+  --color-danger: #e11d48;        /* rose-600 */
+  --color-danger-fg: #ffffff;
+  --color-danger-bg: #ffe4e6;     /* rose-100 */
+
+  /* Focus ring color */
+  --color-ring: #6366f1;          /* indigo-500 */
+
+  /* Radius */
+  --radius-sm: 0.25rem;   /* 4px  */
+  --radius-md: 0.5rem;    /* 8px  */
+  --radius-lg: 0.75rem;   /* 12px */
+  --radius-xl: 1rem;      /* 16px */
+
+  /* Shadow — subtle, border-first elevation */
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
+  --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --shadow-subtle: 0 0 0 1px rgb(15 23 42 / 0.04);
+
+  /* Spacing / density — switched via [data-density] below.
+     Defaults = comfortable. */
+  --space-row: 0.875rem;   /* vertical rhythm of a table/list row */
+  --space-cell: 0.75rem;   /* table cell padding */
+  --control-h: 2.75rem;    /* 44px — touch-target height for controls */
+
+  /* Z-index / layering scale — keep overlays from fighting */
+  --z-dropdown: 1000;
+  --z-sticky: 1010;
+  --z-drawer: 1020;
+  --z-modal: 1030;
+  --z-toast: 1040;
+
+  /* Font — wired to Geist in layout.tsx via next CSS vars */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", "Cascadia Code",
+    "Roboto Mono", monospace;
 }
 
+/* Dark theme overrides — applied when <html> has the .dark class. */
+html.dark {
+  --color-bg: #020617;          /* slate-950 */
+  --color-surface: #0f172a;     /* slate-900 */
+  --color-surface-2: #1e293b;   /* slate-800 */
+  --color-border: #334155;      /* slate-700 */
+  --color-text: #f1f5f9;        /* slate-100 */
+  --color-text-muted: #94a3b8;  /* slate-400 */
+
+  --color-primary: #6366f1;       /* indigo-500 */
+  --color-primary-hover: #818cf8; /* indigo-400 */
+  --color-primary-fg: #ffffff;
+
+  --color-success: #10b981;       /* emerald-500 */
+  --color-success-fg: #022c22;
+  --color-success-bg: #064e3b;    /* emerald-900 */
+
+  --color-warning: #f59e0b;       /* amber-500 */
+  --color-warning-fg: #1c1917;
+  --color-warning-bg: #78350f;    /* amber-900 */
+
+  --color-danger: #f43f5e;        /* rose-500 */
+  --color-danger-fg: #1c0f12;
+  --color-danger-bg: #881337;     /* rose-900 */
+
+  --color-ring: #818cf8;          /* indigo-400 */
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-subtle: 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+/* Density preference — comfortable (default) vs compact.
+   Drives row rhythm, cell padding, and control height. */
+:root[data-density="comfortable"] {
+  --space-row: 0.875rem;
+  --space-cell: 0.75rem;
+  --control-h: 2.75rem;
+}
+:root[data-density="compact"] {
+  --space-row: 0.5rem;
+  --space-cell: 0.5rem;
+  --control-h: 2.25rem;
+}
+
+/* Expose tokens to Tailwind's utility engine.
+   `inline` means utilities read the CSS var at use-site, so theme +
+   density toggles take effect live without recompiling utilities. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-2: var(--color-surface-2);
+  --color-border: var(--color-border);
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-fg: var(--color-primary-fg);
+
+  --color-success: var(--color-success);
+  --color-success-fg: var(--color-success-fg);
+  --color-success-bg: var(--color-success-bg);
+  --color-warning: var(--color-warning);
+  --color-warning-fg: var(--color-warning-fg);
+  --color-warning-bg: var(--color-warning-bg);
+  --color-danger: var(--color-danger);
+  --color-danger-fg: var(--color-danger-fg);
+  --color-danger-bg: var(--color-danger-bg);
+
+  --color-ring: var(--color-ring);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-subtle: var(--shadow-subtle);
+
+  --spacing-row: var(--space-row);
+  --spacing-cell: var(--space-cell);
+  --spacing-control: var(--control-h);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-text);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
+}
+
+/* Tabular numerals for money / quantity figures (opt-in via .tabular-nums
+   is provided by Tailwind; this utility class is a convenience alias). */
+.figure-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Honor reduced-motion globally for all transitions/animations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Receipt print styles ── */

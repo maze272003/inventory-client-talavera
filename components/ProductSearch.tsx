@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, forwardRef } from "react";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { Field, Input, Icon, Badge } from "@/components/ui";
 
 export type CartItem = {
   productId: Id<"products">;
@@ -53,7 +54,10 @@ function SkuLookup({
   return null;
 }
 
-export default function ProductSearch({ onAddToCart }: Props) {
+const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch(
+  { onAddToCart },
+  forwardedRef
+) {
   const [inputValue, setInputValue] = useState("");
   const [lookupSku, setLookupSku] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
@@ -61,6 +65,17 @@ export default function ProductSearch({ onAddToCart }: Props) {
   // Key bumps to remount SkuLookup for a fresh query each time
   const [lookupKey, setLookupKey] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Expose the input element to a forwarded ref (for the focus-search shortcut)
+  // while keeping the internal ref for self-refocus after a scan.
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      inputRef.current = node;
+      if (typeof forwardedRef === "function") forwardedRef(node);
+      else if (forwardedRef) forwardedRef.current = node;
+    },
+    [forwardedRef]
+  );
 
   const { results: searchResults } = usePaginatedQuery(
     api.products.list,
@@ -133,19 +148,21 @@ export default function ProductSearch({ onAddToCart }: Props) {
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-700">
-        Barcode / SKU / Name
-      </label>
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputValue}
-        onChange={handleInputChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Scan barcode or type SKU, then press Enter"
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        autoFocus
-      />
+      <Field
+        label="Barcode / SKU / Name"
+        hint={skuNotFound ? undefined : "Scan a barcode or type a SKU, then press Enter."}
+      >
+        <Input
+          ref={setInputRef}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Scan barcode or type SKU, then press Enter"
+          autoFocus
+          aria-label="Barcode, SKU, or product name"
+        />
+      </Field>
 
       {/* SKU lookup — mounted only when a lookup is in flight */}
       {lookupSku !== null && (
@@ -158,36 +175,44 @@ export default function ProductSearch({ onAddToCart }: Props) {
       )}
 
       {skuNotFound && (
-        <p className="text-xs text-amber-600">
+        <p className="flex items-center gap-1.5 text-xs text-warning-fg" role="status">
+          <Icon name="alert-triangle" size={14} />
           SKU not found — showing name search results below.
         </p>
       )}
       {searchResults && searchResults.length > 0 && (
-        <ul className="border border-gray-200 rounded-lg divide-y divide-gray-100 bg-white shadow-sm max-h-48 overflow-y-auto">
+        <ul className="border border-border rounded-lg divide-y divide-border bg-surface shadow-sm max-h-60 overflow-y-auto">
           {searchResults.map((product) => (
             <li key={product._id}>
               <button
                 type="button"
                 onClick={() => handleSelectProduct(product)}
-                className="w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors"
+                className="flex w-full min-h-[44px] items-center justify-between gap-2 px-cell py-row text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="text-sm font-medium text-gray-900">
-                  {product.name}
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-text">
+                    {product.name}
+                  </span>
+                  <span className="block text-xs text-text-muted">
+                    SKU: {product.sku}
+                  </span>
                 </span>
-                <span className="ml-2 text-xs text-gray-500">
-                  SKU: {product.sku}
-                </span>
-                <span className="ml-2 text-xs text-gray-500">
+                <Badge
+                  variant={product.stockQty <= 0 ? "danger" : "neutral"}
+                  className="shrink-0"
+                >
                   Stock: {product.stockQty}
-                </span>
+                </Badge>
               </button>
             </li>
           ))}
         </ul>
       )}
       {searchTerm !== null && searchResults && searchResults.length === 0 && (
-        <p className="text-xs text-gray-500">No products found.</p>
+        <p className="text-xs text-text-muted">No products found.</p>
       )}
     </div>
   );
-}
+});
+
+export default ProductSearch;

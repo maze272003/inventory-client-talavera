@@ -24,6 +24,7 @@
     "@auth/core": "^0.41.2",
     "@convex-dev/auth": "^0.0.94",
     "convex": "^1.36.1",
+    "geist": "^1.7.2",
     "next": "16.2.4",
     "pdfjs-dist": "^6.0.227",
     "react": "^19.2.5",

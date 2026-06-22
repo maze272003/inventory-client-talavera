@@ -4,15 +4,18 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import { Dialog, Button, Field, Input, useToast } from "@/components/ui";
 
 type Props = {
-  productId: Id<"products">;
+  open: boolean;
+  productId?: Id<"products">;
   productName: string;
   onClose: () => void;
 };
 
-export default function StockInDialog({ productId, productName, onClose }: Props) {
+export default function StockInDialog({ open, productId, productName, onClose }: Props) {
   const stockIn = useMutation(api.inventory.stockIn);
+  const { success, error: toastError } = useToast();
 
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
@@ -21,6 +24,7 @@ export default function StockInDialog({ productId, productName, onClose }: Props
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!productId) return;
     const qty = parseInt(quantity, 10);
     if (isNaN(qty) || String(qty) !== quantity.trim() || qty <= 0) {
       setError("Quantity must be a whole number greater than 0.");
@@ -35,74 +39,67 @@ export default function StockInDialog({ productId, productName, onClose }: Props
     setPending(true);
     try {
       await stockIn({ productId, quantity: qty, unitCost: cost });
+      success("Stock added", `${qty} unit${qty === 1 ? "" : "s"} added to ${productName}.`);
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred.");
+      const message = err instanceof Error ? err.message : "An error occurred.";
+      setError(message);
+      toastError("Stock In failed", message);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Stock In</h2>
-        <p className="text-sm text-gray-500 mb-4">{productName}</p>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Quantity <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter quantity"
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unit Cost (₱) <span className="text-gray-400 font-normal">optional</span>
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={unitCost}
-              onChange={(e) => setUnitCost(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Defaults to product cost price"
-            />
-          </div>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Stock In"
+      description={productName}
+      dismissable={!pending}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button type="submit" form="stock-in-form" loading={pending}>
+            Stock In
+          </Button>
+        </>
+      }
+    >
+      <form id="stock-in-form" onSubmit={handleSubmit} className="space-y-4">
+        <Field label="Quantity" required>
+          <Input
+            type="number"
+            min="1"
+            step="1"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            placeholder="Enter quantity"
+            autoFocus
+          />
+        </Field>
+        <Field label="Unit Cost (₱)" hint="Defaults to product cost price">
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            value={unitCost}
+            onChange={(e) => setUnitCost(e.target.value)}
+            placeholder="Defaults to product cost price"
+          />
+        </Field>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={pending}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {pending ? "Processing..." : "Stock In"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-danger-fg bg-danger-bg rounded-lg px-cell py-2"
+          >
+            {error}
+          </p>
+        )}
+      </form>
+    </Dialog>
   );
 }

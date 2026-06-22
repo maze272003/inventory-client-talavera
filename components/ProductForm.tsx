@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
+import {
+  Button,
+  Drawer,
+  Field,
+  Input,
+  Icon,
+  useToast,
+} from "@/components/ui";
 
 type ProductDoc = {
   _id: Id<"products">;
@@ -22,14 +30,16 @@ type ProductDoc = {
 
 type Props = {
   product?: ProductDoc;
+  open: boolean;
   onClose: () => void;
 };
 
-export default function ProductForm({ product, onClose }: Props) {
+export default function ProductForm({ product, open, onClose }: Props) {
   const isEdit = !!product;
   const createProduct = useMutation(api.products.create);
   const updateProduct = useMutation(api.products.update);
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const { success, error: errorToast } = useToast();
 
   const [name, setName] = useState(product?.name ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
@@ -157,9 +167,15 @@ export default function ProductForm({ product, onClose }: Props) {
         if (imageId) createArgs.imageId = imageId;
         await createProduct(createArgs);
       }
+      success(
+        isEdit ? "Product updated" : "Product added",
+        name.trim()
+      );
       onClose();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "An error occurred.");
+      const message = err instanceof Error ? err.message : "An error occurred.";
+      setError(message);
+      errorToast(isEdit ? "Could not save changes" : "Could not add product", message);
     } finally {
       setPending(false);
     }
@@ -168,189 +184,154 @@ export default function ProductForm({ product, onClose }: Props) {
   const isDisabled = pending || uploading;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          {isEdit ? "Edit Product" : "Add Product"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit product" : "Add product"}
+      description={isEdit ? "Update product details and pricing." : "Create a new inventory item."}
+      width="min(32rem, 100vw)"
+      dismissable={!isDisabled}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isDisabled}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="product-form"
+            loading={isDisabled}
+            disabled={isDisabled}
+          >
+            {uploading
+              ? "Uploading…"
+              : pending
+                ? "Saving…"
+                : isEdit
+                  ? "Save changes"
+                  : "Add product"}
+          </Button>
+        </>
+      }
+    >
+      <form id="product-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <Field label="Name" required>
+              <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Product name"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                SKU <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. SKU-001"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Category <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="e.g. Tiles"
-              />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Model
-              </label>
-              <input
-                type="text"
+            </Field>
+          </div>
+          <Field label="SKU" required>
+            <Input
+              value={sku}
+              onChange={(e) => setSku(e.target.value)}
+              placeholder="e.g. SKU-001"
+            />
+          </Field>
+          <Field label="Category" required>
+            <Input
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Tiles"
+            />
+          </Field>
+          <div className="col-span-2">
+            <Field label="Model">
+              <Input
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g. Honda CB500F 2023"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cost Price (₱) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={costPrice}
-                onChange={(e) => setCostPrice(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sell Price (₱) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={sellPrice}
-                onChange={(e) => setSellPrice(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="0.00"
-              />
-            </div>
-            {!isEdit && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Initial Stock Qty
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={stockQty}
-                  onChange={(e) => setStockQty(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="0"
-                />
-              </div>
-            )}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Reorder Threshold
-              </label>
-              <input
+            </Field>
+          </div>
+          <Field label="Cost price (₱)" required>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={costPrice}
+              onChange={(e) => setCostPrice(e.target.value)}
+              placeholder="0.00"
+              className="tabular-nums"
+            />
+          </Field>
+          <Field label="Sell price (₱)" required>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              value={sellPrice}
+              onChange={(e) => setSellPrice(e.target.value)}
+              placeholder="0.00"
+              className="tabular-nums"
+            />
+          </Field>
+          {!isEdit && (
+            <Field label="Initial stock qty">
+              <Input
                 type="number"
                 min="0"
                 step="1"
-                value={reorderThreshold}
-                onChange={(e) => setReorderThreshold(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={stockQty}
+                onChange={(e) => setStockQty(e.target.value)}
                 placeholder="0"
+                className="tabular-nums"
               />
-            </div>
+            </Field>
+          )}
+          <Field label="Reorder threshold">
+            <Input
+              type="number"
+              min="0"
+              step="1"
+              value={reorderThreshold}
+              onChange={(e) => setReorderThreshold(e.target.value)}
+              placeholder="0"
+              className="tabular-nums"
+            />
+          </Field>
 
-            {/* Image upload */}
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Product Photo
-              </label>
+          {/* Image upload */}
+          <div className="col-span-2">
+            <Field label="Product photo" hint="PNG, JPG, WEBP accepted">
               <div className="flex items-center gap-4">
                 {/* Preview */}
-                <div className="flex-shrink-0 w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center">
+                <div className="flex-shrink-0 w-16 h-16 rounded-lg border border-border bg-surface-2 overflow-hidden flex items-center justify-center text-text-muted">
                   {previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={previewUrl}
                       alt="Product preview"
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <svg
-                      className="w-6 h-6 text-gray-300"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9H5"
-                      />
-                    </svg>
+                    <Icon name="package" className="w-6 h-6" />
                   )}
                 </div>
-                <div className="flex-1">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="block w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                  />
-                  <p className="mt-1 text-xs text-gray-400">
-                    PNG, JPG, WEBP accepted
-                  </p>
-                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  aria-label="Product photo"
+                  className="block w-full text-sm text-text-muted file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-fg hover:file:bg-primary-hover file:cursor-pointer cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+                />
               </div>
-            </div>
+            </Field>
           </div>
+        </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <div className="flex gap-3 justify-end pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isDisabled}
-              className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? "Uploading..." : pending ? "Saving..." : isEdit ? "Save Changes" : "Add Product"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {error && (
+          <p
+            role="alert"
+            className="text-sm text-danger-fg bg-danger-bg border border-danger-fg/20 rounded-md px-3 py-2"
+          >
+            {error}
+          </p>
+        )}
+      </form>
+    </Drawer>
   );
 }
