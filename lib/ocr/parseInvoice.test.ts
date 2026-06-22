@@ -41,6 +41,35 @@ describe("parseInvoice", () => {
     expect(result.lines[1].item).toContain("HONDA");
   });
 
+  it("merges multi-line wrapped ITEM cells into one product line", () => {
+    // Real-invoice layout: each product's QTY/UNIT/W.SALE/TOTAL are on the top
+    // line, but the ITEM (product name) wraps down several lines in the ITEM
+    // column. groupRows sees each wrapped line as its own row; parseInvoice must
+    // merge them into one logical product line.
+    const words: OcrWord[] = [
+      ...HEADER, // y=100
+      // Product 1 — top line + wrapped ITEM
+      w("5", 50, 140), w("Pcs", 150, 140), w("300X17", 480, 140),
+      w("670.00", 760, 140), w("3,350.00", 900, 140),
+      w("RUDDER", 480, 162), w("SPL", 480, 184), w("NEW", 560, 184),
+      // Product 2 — top line + wrapped ITEM
+      w("24", 50, 210), w("Pcs", 150, 210), w("HONDA", 480, 210),
+      w("305.00", 760, 210), w("7,320.00", 900, 210),
+      w("OIL", 480, 232), w("4T", 480, 254),
+    ];
+    const result = parseInvoice(words);
+    expect(result.lines.length).toBe(2);
+    expect(result.lines[0].quantity).toBe(5);
+    expect(result.lines[0].unitCost).toBe(670);
+    expect(result.lines[0].item).toContain("300X17");
+    expect(result.lines[0].item).toContain("RUDDER");
+    expect(result.lines[0].item).toContain("NEW");
+    expect(result.lines[1].quantity).toBe(24);
+    expect(result.lines[1].unitCost).toBe(305);
+    expect(result.lines[1].item).toContain("HONDA");
+    expect(result.lines[1].item).toContain("OIL");
+  });
+
   it("handles a row with missing cells without crashing or inventing lines", () => {
     const words: OcrWord[] = [
       ...HEADER,

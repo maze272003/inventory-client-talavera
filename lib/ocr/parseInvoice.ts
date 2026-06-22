@@ -158,6 +158,29 @@ export function parseInvoice(words: OcrWord[]): ParsedInvoice {
 
   const anchors = header.anchors;
   const lines: ParsedLine[] = [];
+
+  // A product's QTY/UNIT/W.SALE/TOTAL sit on its top line, but the ITEM (and
+  // occasionally MODEL) cell wraps across several lines below. groupRows yields
+  // each wrapped line as its own row, so we assemble LOGICAL rows: a row that
+  // carries a quantity or a price starts a new product line; rows that carry
+  // only ITEM/MODEL text are continuations and append to the current product.
+  let current: ParsedLine | null = null;
+  const pushCurrent = () => {
+    if (!current) return;
+    const item = current.item?.trim() || undefined;
+    // A real product line must have a name (the ITEM). This also drops the
+    // grand-total row and blank separators, which have no item text.
+    if (item) {
+      lines.push({
+        quantity: current.quantity,
+        model: current.model?.trim() || undefined,
+        item,
+        unitCost: current.unitCost,
+      });
+    }
+    current = null;
+  };
+
   for (let i = header.rowIndex + 1; i < rows.length; i++) {
     const row = rows[i];
     const buckets: Record<ColKey, string[]> = { qty: [], unit: [], model: [], item: [], wsale: [], total: [] };
@@ -168,12 +191,17 @@ export function parseInvoice(words: OcrWord[]): ParsedInvoice {
     const model = buckets.model.join(" ").trim() || undefined;
     const item = buckets.item.join(" ").trim() || undefined;
 
-    // Skip rows that carry no item text AND no money — likely separators/blank.
-    if (!item && unitCost === undefined) continue;
-    // Skip an obvious grand-total row (no item text, no qty, has a total only).
-    if (!item && quantity === undefined && model === undefined) continue;
-
-    lines.push({ quantity, model, item, unitCost });
+    const isAnchor = quantity !== undefined || unitCost !== undefined;
+    if (isAnchor) {
+      pushCurrent();
+      current = { quantity, model, item, unitCost };
+    } else if (current) {
+      // Continuation line — append wrapped ITEM / MODEL text to the product.
+      if (item) current.item = current.item ? `${current.item} ${item}` : item;
+      if (model) current.model = current.model ? `${current.model} ${model}` : model;
+    }
+    // A continuation with no current product (stray pre-table text) is ignored.
   }
+  pushCurrent();
   return { supplierName, referenceNumber, lines };
 }

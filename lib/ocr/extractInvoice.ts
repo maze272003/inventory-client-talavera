@@ -1,6 +1,7 @@
 import { renderToImages } from "./renderToImages";
 import { preprocess } from "./preprocess";
 import { runOcr } from "./runOcr";
+import { extractTextLayer } from "./extractTextLayer";
 import { parseInvoice } from "./parseInvoice";
 import { OcrWord, ParsedInvoice } from "./types";
 
@@ -8,6 +9,16 @@ export async function extractInvoice(
   file: File,
   onProgress: (p: { stage: string; fraction: number }) => void,
 ): Promise<ParsedInvoice> {
+  // Prefer the PDF's embedded text layer — exact, no OCR error. Only digital /
+  // "reconstructed" PDFs have one; true scans/photos return null here and fall
+  // through to the OCR pipeline below.
+  onProgress({ stage: "Reading embedded text", fraction: 0 });
+  const textWords = await extractTextLayer(file);
+  if (textWords) {
+    onProgress({ stage: "Parsing", fraction: 1 });
+    return parseInvoice(textWords);
+  }
+
   onProgress({ stage: "Rendering document", fraction: 0 });
   const canvases = await renderToImages(file);
   const allWords: OcrWord[] = [];
