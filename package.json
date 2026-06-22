@@ -17,8 +17,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:convex": "tsc --noEmit -p convex/tsconfig.json",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "prepare": "husky"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@auth/core": "^0.41.2",
