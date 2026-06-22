@@ -87,11 +87,74 @@ function detectHeaderFields(rows: OcrWord[][]): { supplierName?: string; referen
   return { supplierName, referenceNumber };
 }
 
+function parseWithoutHeader(rows: OcrWord[][]): ParsedLine[] {
+  const lines: ParsedLine[] = [];
+  for (const row of rows) {
+    const tokens = row.map((wd) => wd.text);
+
+    // Determine if the first token is a quantity candidate.
+    let quantityToken: string | undefined;
+    let quantity: number | undefined;
+    const firstToken = tokens[0];
+    if (firstToken !== undefined) {
+      const firstNum = parseNum(firstToken);
+      if (
+        /^[\d.,]+$/.test(firstToken) &&
+        firstNum !== undefined &&
+        Number.isFinite(firstNum) &&
+        Number.isInteger(firstNum) &&
+        firstNum < 1000
+      ) {
+        quantityToken = firstToken;
+        quantity = firstNum;
+      }
+    }
+
+    const remaining = quantityToken !== undefined ? tokens.slice(1) : tokens;
+
+    // Split remaining into numeric and non-numeric tokens.
+    const moneyTokens: string[] = [];
+    const itemTokens: string[] = [];
+    for (const token of remaining) {
+      const n = parseNum(token);
+      if (/^[\d.,]+$/.test(token) && n !== undefined && Number.isFinite(n)) {
+        moneyTokens.push(token);
+      } else {
+        itemTokens.push(token);
+      }
+    }
+
+    // unitCost: second-to-last money token if >= 2, first if exactly 1, else undefined.
+    let unitCost: number | undefined;
+    if (moneyTokens.length >= 2) {
+      unitCost = parseNum(moneyTokens[moneyTokens.length - 2]);
+    } else if (moneyTokens.length === 1) {
+      unitCost = parseNum(moneyTokens[0]);
+    }
+
+    const itemStr = itemTokens.join(" ").trim();
+    const item = itemStr !== "" ? itemStr : undefined;
+
+    // model is always undefined in fallback — can't infer without a header.
+    const model = undefined;
+
+    // Skip if both item and unitCost are absent.
+    if (item === undefined && unitCost === undefined) continue;
+    // Skip single numeric token rows with no item and no quantity (grand-total row).
+    if (item === undefined && quantity === undefined && moneyTokens.length <= 1 && itemTokens.length === 0) continue;
+
+    lines.push({ quantity, model, item, unitCost });
+  }
+  return lines;
+}
+
 export function parseInvoice(words: OcrWord[]): ParsedInvoice {
   const rows = groupRows(words);
   const header = findHeader(rows);
   const { supplierName, referenceNumber } = detectHeaderFields(rows);
-  if (!header) return { supplierName, referenceNumber, lines: [] };
+  if (!header) {
+    return { supplierName, referenceNumber, lines: parseWithoutHeader(rows) };
+  }
 
   const anchors = header.anchors;
   const lines: ParsedLine[] = [];

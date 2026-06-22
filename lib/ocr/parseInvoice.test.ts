@@ -54,6 +54,38 @@ describe("parseInvoice", () => {
     expect(result.lines[0].quantity).toBeUndefined();
   });
 
+  it("falls back to heuristic parsing when no header row is detected", () => {
+    // No header row — two data rows with positional tokens.
+    // row A: qty=2, model=XRM (non-numeric, precedes item), item="REAR AXLE", unitCost=80.00, total=160.00
+    // row B: qty=24, item="HONDA OIL", unitCost=305.00, total=7320.00
+    const words: OcrWord[] = [
+      // row A
+      w("2", 50, 140),
+      w("XRM", 260, 140),
+      w("REAR", 460, 140),
+      w("AXLE", 540, 140),
+      w("80.00", 760, 140),
+      w("160.00", 900, 140),
+      // row B
+      w("24", 50, 180),
+      w("HONDA", 460, 180),
+      w("OIL", 560, 180),
+      w("305.00", 760, 180),
+      w("7320.00", 900, 180),
+    ];
+    const result = parseInvoice(words);
+    expect(result.lines.length).toBe(2);
+    // line 0
+    expect(result.lines[0].quantity).toBe(2);
+    expect(result.lines[0].item).toContain("REAR");
+    expect(result.lines[0].item).toContain("AXLE");
+    expect(result.lines[0].unitCost).toBe(80);
+    // line 1
+    expect(result.lines[1].quantity).toBe(24);
+    expect(result.lines[1].item).toContain("HONDA");
+    expect(result.lines[1].unitCost).toBe(305);
+  });
+
   it("detects supplier name and reference number from labeled tokens", () => {
     const words: OcrWord[] = [
       w("Customer:", 40, 30), w("SAN", 160, 30), w("PEDRO", 220, 30),

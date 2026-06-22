@@ -414,6 +414,12 @@ export default function ImportPage() {
             </button>
           </div>
 
+          {drafts.some((d) => d.mode === "new" && !isDraftValid(d)) && (
+            <p className="mb-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Extracted rows need a Category and Sell Price before they can be imported.
+            </p>
+          )}
+
           <div className="space-y-3">
             {drafts.map((draft, index) => (
               <PurchaseLineRow
