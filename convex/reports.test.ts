@@ -179,3 +179,32 @@ test("dashboardAnalytics excludes archived sales and is admin-only", async () =>
     cashier.query(api.reports.dashboardAnalytics, { startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0 }),
   ).rejects.toThrow();
 });
+
+test("cashFlow buckets sales revenue against purchase spend", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Box", sku: "bx1", category: "Supplies",
+    costPrice: 5, sellPrice: 12, stockQty: 100, reorderThreshold: 5,
+  });
+  await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 2 }], cashTendered: 100 });
+
+  // A purchase whose purchaseDate is "now" (in range)
+  await t.run(async (ctx) => {
+    const adminId = (await ctx.db.query("userProfiles").first())!.userId;
+    const fileId = await ctx.storage.store(new Blob(["x"]));
+    await ctx.db.insert("purchases", {
+      supplierName: "Acme", purchaseDate: Date.now(), total: 500, itemCount: 1,
+      userId: adminId, fileId: fileId,
+    });
+  });
+
+  const res = await admin.query(api.reports.cashFlow, {
+    startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0,
+  });
+  expect(res.totals.revenue).toBe(24); // 2*12
+  expect(res.totals.spend).toBe(500);
+  expect(res.truncated).toBe(false);
+  const withRevenue = res.buckets.find((b) => b.revenue > 0);
+  expect(withRevenue).toBeDefined();
+});

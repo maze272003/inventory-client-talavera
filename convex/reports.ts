@@ -243,3 +243,57 @@ export const dashboardAnalytics = query({
     };
   },
 });
+
+export const cashFlow = query({
+  args: {
+    startMs: v.number(),
+    endMs: v.number(),
+    granularity: granularityValidator,
+    tzOffsetMinutes: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const tz = args.tzOffsetMinutes;
+    const gran = args.granularity as Granularity;
+
+    const rawSales = await ctx.db
+      .query("sales")
+      .withIndex("by_creation_time", (q) =>
+        q.gte("_creationTime", args.startMs).lte("_creationTime", args.endMs),
+      )
+      .take(MAX_SALES + 1);
+    const truncated = rawSales.length > MAX_SALES;
+    const sales = truncated ? rawSales.slice(0, MAX_SALES) : rawSales;
+
+    // purchases have no purchaseDate index; scan (low volume) and narrow in memory.
+    const allPurchases = await ctx.db.query("purchases").take(MAX_SALES + 1);
+    const purchases = allPurchases.filter(
+      (p) => p.isArchived !== true && p.purchaseDate >= args.startMs && p.purchaseDate <= args.endMs,
+    );
+
+    type Bucket = { bucketStart: number; label: string; revenue: number; spend: number };
+    const buckets = new Map<number, Bucket>();
+    for (const bs of enumerateBuckets(args.startMs, args.endMs, gran, tz)) {
+      buckets.set(bs, { bucketStart: bs, label: bucketLabel(bs, gran, tz), revenue: 0, spend: 0 });
+    }
+
+    let totalRevenue = 0, totalSpend = 0;
+    for (const sale of sales) {
+      if (sale.isArchived === true) continue;
+      totalRevenue += sale.total;
+      const b = buckets.get(bucketStartForTs(sale._creationTime, gran, tz));
+      if (b) b.revenue += sale.total;
+    }
+    for (const p of purchases) {
+      totalSpend += p.total;
+      const b = buckets.get(bucketStartForTs(p.purchaseDate, gran, tz));
+      if (b) b.spend += p.total;
+    }
+
+    return {
+      buckets: [...buckets.values()].sort((a, b) => a.bucketStart - b.bucketStart),
+      totals: { revenue: totalRevenue, spend: totalSpend },
+      truncated,
+    };
+  },
+});
