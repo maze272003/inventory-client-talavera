@@ -138,3 +138,37 @@ export const assertAdminCaller = query({
     return { adminId: userId };
   },
 });
+
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireRole(ctx, "admin");
+    const profiles = await ctx.db.query("userProfiles").collect();
+
+    const rows = await Promise.all(
+      profiles.map(async (p) => {
+        const lastAudit = await ctx.db
+          .query("auditLog")
+          .withIndex("by_userId", (q) => q.eq("userId", p.userId))
+          .order("desc")
+          .take(1);
+        const sales = await ctx.db
+          .query("sales")
+          .withIndex("by_cashier", (q) => q.eq("cashierId", p.userId))
+          .take(1000);
+        const user = await ctx.db.get("users", p.userId);
+        return {
+          userId: p.userId,
+          name: p.name,
+          email: p.email ?? user?.email ?? null,
+          role: p.role,
+          disabled: p.disabled ?? false,
+          lastActiveAt: lastAudit[0]?._creationTime ?? null,
+          totalSales: sales.length,
+        };
+      }),
+    );
+
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
+  },
+});

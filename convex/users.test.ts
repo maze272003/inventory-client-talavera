@@ -154,3 +154,23 @@ test("assertAdminCaller returns adminId for admins and throws for cashiers", asy
   expect(res.adminId).toBe(adminId);
   await expect(cashier.query(api.users.assertAdminCaller, {})).rejects.toThrow("Requires admin access");
 });
+
+test("users.list returns the roster with totals and is admin-only", async () => {
+  const t = convexTest(schema, modules);
+  const { as: admin } = await makeUser(t, { name: "Boss", role: "admin" });
+  const { userId: cashierId, as: cashier } = await makeUser(t, { name: "Cash", role: "cashier" });
+
+  const pid = await admin.mutation(api.products.create, {
+    name: "Gum", sku: "GM1", category: "Food", costPrice: 1, sellPrice: 3, stockQty: 10, reorderThreshold: 1,
+  });
+  await cashier.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 1 }], cashTendered: 5 });
+
+  const roster = await admin.query(api.users.list, {});
+  const cashRow = roster.find((r) => r.userId === cashierId)!;
+  expect(cashRow.name).toBe("Cash");
+  expect(cashRow.email).toBe("Cash@a.com");
+  expect(cashRow.totalSales).toBe(1);
+  expect(cashRow.lastActiveAt).not.toBeNull();
+
+  await expect(cashier.query(api.users.list, {})).rejects.toThrow("Requires admin access");
+});
