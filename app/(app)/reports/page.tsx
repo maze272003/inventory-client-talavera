@@ -115,6 +115,11 @@ export default function ReportsPage() {
     isAdmin ? { startMs: range.startMs, endMs: range.endMs, limit: 10 } : "skip",
   );
 
+  const cashierRows = useQuery(
+    api.reports.cashierPerformance,
+    isAdmin ? { startMs: range.startMs, endMs: range.endMs } : "skip",
+  );
+
   // Admin guard
   if (currentUser === undefined) {
     return (
@@ -371,6 +376,76 @@ export default function ReportsPage() {
                     icon="bar-chart"
                     title="No sales in this period"
                     description="Try a different date range."
+                  />
+                }
+              />
+            )}
+          </CardBody>
+        </Card>
+
+        {/* Cashier Performance table */}
+        <Card>
+          <CardHeader>
+            <h2 className="text-base font-semibold text-text">Cashier Performance</h2>
+          </CardHeader>
+          <CardBody>
+            {cashierRows === undefined ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} height={20} />
+                ))}
+              </div>
+            ) : (
+              <ResponsiveTable
+                caption="Cashier performance"
+                rows={cashierRows}
+                rowKey={(r) => r.cashierId}
+                columns={[
+                  {
+                    key: "name",
+                    header: "Cashier",
+                    align: "left",
+                    cell: (r) => (
+                      <div>
+                        <div className="font-medium text-text">{r.name}</div>
+                        <div className="text-xs text-text-muted">{r.email ?? "—"}</div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "saleCount",
+                    header: "Sales",
+                    align: "right",
+                    className: "tabular-nums text-text-muted",
+                    cell: (r) => r.saleCount,
+                  },
+                  {
+                    key: "units",
+                    header: "Units",
+                    align: "right",
+                    className: "tabular-nums text-text-muted",
+                    cell: (r) => r.units,
+                  },
+                  {
+                    key: "revenue",
+                    header: "Revenue",
+                    align: "right",
+                    className: "tabular-nums font-semibold text-text",
+                    cell: (r) => formatPeso(r.revenue),
+                  },
+                  {
+                    key: "profit",
+                    header: "Profit",
+                    align: "right",
+                    className: "tabular-nums font-semibold text-text",
+                    cell: (r) => formatPeso(r.profit),
+                  },
+                ]}
+                empty={
+                  <EmptyState
+                    icon="bar-chart"
+                    title="No sales in range"
+                    description="Adjust the date range."
                   />
                 }
               />
