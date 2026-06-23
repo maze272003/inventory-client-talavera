@@ -14,6 +14,7 @@ import {
   Icon,
   PageHeader,
   ResponsiveTable,
+  Select,
   Skeleton,
   useToast,
   type Column,
@@ -26,7 +27,8 @@ type AuditAction =
   | "restore"
   | "sale"
   | "stock_in"
-  | "adjustment";
+  | "adjustment"
+  | "password_reset";
 
 type AuditEntry = {
   _id: Id<"auditLog">;
@@ -39,6 +41,7 @@ type AuditEntry = {
   reverted: boolean;
   userId: Id<"users">;
   userName: string;
+  userEmail: string | null;
 };
 
 type BadgeVariant = "neutral" | "primary" | "success" | "warning" | "danger";
@@ -51,6 +54,7 @@ const ACTION_VARIANT: Record<AuditAction, BadgeVariant> = {
   sale: "primary",
   stock_in: "success",
   adjustment: "warning",
+  password_reset: "neutral",
 };
 
 const ACTION_LABEL: Record<AuditAction, string> = {
@@ -61,6 +65,7 @@ const ACTION_LABEL: Record<AuditAction, string> = {
   sale: "Sale",
   stock_in: "Stock In",
   adjustment: "Adjustment",
+  password_reset: "Password Reset",
 };
 
 function actionVariant(action: string): BadgeVariant {
@@ -77,8 +82,13 @@ export default function AuditLogPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
+  const [filterUserId, setFilterUserId] = useState<Id<"users"> | "">("");
+  const [filterAction, setFilterAction] = useState("");
+  const [filterEntity, setFilterEntity] = useState("");
 
   const isAdmin = currentUser?.role === "admin";
+
+  const roster = useQuery(api.users.list, isAdmin ? {} : "skip");
 
   const latest = useQuery(
     api.audit.latest,
@@ -86,7 +96,13 @@ export default function AuditLogPage() {
   );
   const { results, status, loadMore } = usePaginatedQuery(
     api.audit.list,
-    isAdmin ? {} : "skip",
+    isAdmin
+      ? {
+          ...(filterUserId ? { userId: filterUserId as Id<"users"> } : {}),
+          ...(filterAction ? { action: filterAction } : {}),
+          ...(filterEntity ? { entityTable: filterEntity } : {}),
+        }
+      : "skip",
     { initialNumItems: 20 }
   );
 
@@ -158,7 +174,14 @@ export default function AuditLogPage() {
     {
       key: "user",
       header: "User",
-      cell: (entry) => <span className="text-text">{entry.userName}</span>,
+      cell: (entry) => (
+        <div>
+          <div className="text-text">{entry.userName}</div>
+          {entry.userEmail && (
+            <div className="text-text-muted text-xs">{entry.userEmail}</div>
+          )}
+        </div>
+      ),
     },
     {
       key: "entity",
@@ -213,6 +236,56 @@ export default function AuditLogPage() {
         title="Audit Log"
         subtitle="A newest-first history of data changes. Only the most recent undoable change can be reverted."
       />
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Select
+          value={filterUserId}
+          onChange={(e) => setFilterUserId(e.target.value as Id<"users"> | "")}
+          className="w-48"
+        >
+          <option value="">All users</option>
+          {(roster ?? []).map((u) => (
+            <option key={u.userId} value={u.userId}>
+              {u.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={filterAction}
+          onChange={(e) => setFilterAction(e.target.value)}
+          className="w-48"
+        >
+          <option value="">All actions</option>
+          {(
+            [
+              "create",
+              "update",
+              "archive",
+              "restore",
+              "sale",
+              "stock_in",
+              "adjustment",
+              "password_reset",
+            ] as AuditAction[]
+          ).map((a) => (
+            <option key={a} value={a}>
+              {actionLabel(a)}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={filterEntity}
+          onChange={(e) => setFilterEntity(e.target.value)}
+          className="w-48"
+        >
+          <option value="">All entities</option>
+          {["products", "purchases", "sales", "users"].map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </Select>
+      </div>
 
       {status === "LoadingFirstPage" ? (
         <Card>
