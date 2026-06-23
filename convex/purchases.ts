@@ -4,6 +4,7 @@ import { paginationOptsValidator } from "convex/server";
 import { Doc } from "./_generated/dataModel";
 import { requireRole } from "./lib/auth";
 import { recordAudit } from "./lib/audit";
+import { nextBatchNumber } from "./lib/batch";
 
 const lineValidator = v.object({
   existingProductId: v.optional(v.id("products")),
@@ -58,6 +59,9 @@ export const createPurchase = mutation({
       let productId = line.existingProductId ?? null;
       if (line.newProduct) {
         const np = line.newProduct;
+        // Products entered via PDF import get an auto-generated batch number too,
+        // matching products.create (the manual entry path).
+        const batchNumber = await nextBatchNumber(ctx, Date.now());
         productId = await ctx.db.insert("products", {
           name: np.name,
           sku: "",
@@ -68,6 +72,7 @@ export const createPurchase = mutation({
           stockQty: 0,
           reorderThreshold: 0,
           isActive: true,
+          batchNumber,
         });
         productsCreated++;
       }
