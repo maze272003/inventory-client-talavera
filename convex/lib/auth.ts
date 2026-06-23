@@ -23,6 +23,7 @@ export async function requireUser(ctx: QueryCtx | MutationCtx) {
   if (!userId) throw new Error("Not authenticated");
   const profile = await getProfile(ctx, userId);
   if (!profile) throw new Error("No profile for user");
+  if (profile.disabled === true) throw new Error("Account disabled");
   return { userId, profile };
 }
 

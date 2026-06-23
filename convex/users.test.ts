@@ -23,3 +23,29 @@ test("schema accepts userProfiles email/disabled/createdBy fields", async () => 
   expect(row!.email).toBe("x@y.com");
   expect(row!.disabled).toBe(false);
 });
+
+async function makeUser(
+  t: ReturnType<typeof convexTest>,
+  opts: { name: string; role: "admin" | "cashier"; disabled?: boolean },
+) {
+  const userId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: `${opts.name}@a.com` });
+    await ctx.db.insert("userProfiles", {
+      userId: id,
+      name: opts.name,
+      role: opts.role,
+      email: `${opts.name}@a.com`,
+      disabled: opts.disabled ?? false,
+    });
+    return id;
+  });
+  return { userId, as: t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` }) };
+}
+
+test("a disabled user is rejected by currentUser-protected endpoints", async () => {
+  const t = convexTest(schema, modules);
+  const { as: disabled } = await makeUser(t, { name: "Ghost", role: "cashier", disabled: true });
+  await expect(
+    disabled.mutation(api.sales.createSale, { items: [], cashTendered: 0 }),
+  ).rejects.toThrow("Account disabled");
+});
