@@ -145,3 +145,12 @@ test("rename updates the display name", async () => {
   );
   expect(profile!.name).toBe("New");
 });
+
+test("assertAdminCaller returns adminId for admins and throws for cashiers", async () => {
+  const t = convexTest(schema, modules);
+  const { userId: adminId, as: admin } = await makeUser(t, { name: "Boss", role: "admin" });
+  const { as: cashier } = await makeUser(t, { name: "Cash", role: "cashier" });
+  const res = await admin.query(api.users.assertAdminCaller, {});
+  expect(res.adminId).toBe(adminId);
+  await expect(cashier.query(api.users.assertAdminCaller, {})).rejects.toThrow("Requires admin access");
+});

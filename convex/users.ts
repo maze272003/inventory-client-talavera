@@ -130,3 +130,11 @@ export const rename = mutation({
     return null;
   },
 });
+
+export const assertAdminCaller = query({
+  args: {},
+  handler: async (ctx) => {
+    const { userId } = await requireRole(ctx, "admin");
+    return { adminId: userId };
+  },
+});
