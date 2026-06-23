@@ -131,3 +131,22 @@ test("createPurchase atomic rollback: invalid 2nd line leaves 1st product unchan
   const product = await admin.query(api.products.getBySku, { sku: "CL1" });
   expect(product?.stockQty).toEqual(10);
 });
+
+test("createPurchase assigns an auto-generated batch number to imported new products", async () => {
+  const t = convexTest(schema, modules);
+  const { t: admin } = await asAdmin(t);
+  const fileId = await fakeFileId(t);
+  await admin.mutation(api.purchases.createPurchase, {
+    fileId, supplierName: "Supplier A", purchaseDate: 1,
+    lines: [
+      { newProduct: { name: "Imported Helmet", category: "Gear", sellPrice: 900 }, quantity: 2, unitCost: 700 },
+    ],
+  });
+  // Imported new products have an empty sku, so look the row up by name.
+  const product = await t.run(async (ctx) => {
+    const all = await ctx.db.query("products").take(50);
+    return all.find((p) => p.name === "Imported Helmet") ?? null;
+  });
+  expect(product).not.toBeNull();
+  expect(product?.batchNumber).toMatch(/^BN-\d{8}-\d{4,}$/);
+});
