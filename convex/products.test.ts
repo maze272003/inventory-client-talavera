@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -101,4 +101,85 @@ test("lowStock returns only active products at or below reorder threshold", asyn
   expect(resultIds).not.toContain(id4);
   // HighItem (stockQty 10 > threshold 5) must not appear
   expect(result.some((p) => p.sku === "H1")).toBe(false);
+});
+
+// Batch number (1): create yields a well-formed BN-YYYYMMDD-NNNN code
+test("create assigns a batchNumber matching the BN format", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  const id = await admin.mutation(api.products.create, {
+    name: "Batched", sku: "BN1", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const found = await admin.query(api.products.getBySku, { sku: "BN1" });
+  expect(found?._id).toEqual(id);
+  expect(found?.batchNumber).toMatch(/^BN-\d{8}-\d{4,}$/);
+});
+
+// Batch number (2): two creates produce incrementing suffixes N then N+1
+test("batchNumber suffix increments across two creates", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  await admin.mutation(api.products.create, {
+    name: "First", sku: "BN-A", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  await admin.mutation(api.products.create, {
+    name: "Second", sku: "BN-B", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const first = await admin.query(api.products.getBySku, { sku: "BN-A" });
+  const second = await admin.query(api.products.getBySku, { sku: "BN-B" });
+  const suffix = (bn: string | undefined) => Number(bn!.split("-")[2]);
+  expect(suffix(second?.batchNumber)).toEqual(suffix(first?.batchNumber) + 1);
+});
+
+// Batch number (3): update leaves batchNumber unchanged (immutable)
+test("update does not change batchNumber", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  const id = await admin.mutation(api.products.create, {
+    name: "Immutable", sku: "BN-IMM", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const before = await admin.query(api.products.getBySku, { sku: "BN-IMM" });
+  await admin.mutation(api.products.update, {
+    id, name: "Renamed", sku: "BN-IMM", category: "Y",
+    costPrice: 3, sellPrice: 4, reorderThreshold: 9,
+  });
+  const after = await admin.query(api.products.getBySku, { sku: "BN-IMM" });
+  expect(after?.name).toEqual("Renamed");
+  expect(after?.batchNumber).toEqual(before?.batchNumber);
+});
+
+// Batch number (4): backfill numbers un-numbered rows, leaves numbered rows alone
+test("backfillBatchNumbersInternal numbers only un-numbered products", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+
+  // Row created through create() already has a batchNumber.
+  const numberedId = await admin.mutation(api.products.create, {
+    name: "AlreadyNumbered", sku: "BN-NUM", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const numberedBefore = await admin.query(api.products.getBySku, { sku: "BN-NUM" });
+
+  // Row inserted directly WITHOUT a batchNumber (simulates a pre-feature doc).
+  const unNumberedId = await t.run((ctx) =>
+    ctx.db.insert("products", {
+      name: "Legacy", sku: "BN-LEGACY", category: "X",
+      costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1, isActive: true,
+    }),
+  );
+
+  const result = await t.mutation(internal.databaseMaintenance.backfillBatchNumbersInternal, {});
+  expect(result.patched).toEqual(1);
+
+  // The legacy row now has a well-formed batch number.
+  const backfilled = await t.run((ctx) => ctx.db.get("products", unNumberedId));
+  expect(backfilled?.batchNumber).toMatch(/^BN-\d{8}-\d{4,}$/);
+
+  // The already-numbered row is untouched.
+  const numberedAfter = await t.run((ctx) => ctx.db.get("products", numberedId));
+  expect(numberedAfter?.batchNumber).toEqual(numberedBefore?.batchNumber);
 });

@@ -4,6 +4,7 @@ import { paginationOptsValidator } from "convex/server";
 import { requireRole, requireUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
 import { recordAudit } from "./lib/audit";
+import { nextBatchNumber } from "./lib/batch";
 
 async function withImageUrl(ctx: QueryCtx, product: Doc<"products">) {
   const imageUrl = product.imageId ? await ctx.storage.getUrl(product.imageId) : null;
@@ -24,7 +25,8 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireRole(ctx, "admin");
-    const id = await ctx.db.insert("products", { ...args, isActive: true });
+    const batchNumber = await nextBatchNumber(ctx, Date.now());
+    const id = await ctx.db.insert("products", { ...args, isActive: true, batchNumber });
     if (args.stockQty > 0) {
       await ctx.db.insert("inventoryLedger", {
         productId: id,
@@ -41,7 +43,7 @@ export const create = mutation({
       entityTable: "products",
       entityId: id,
       action: "create",
-      summary: `Created product ${args.name}`,
+      summary: `Created product ${args.name} (batch ${batchNumber})`,
       after,
       undoable: true,
       userId,
@@ -78,6 +80,7 @@ export const update = mutation({
       sellPrice: existing.sellPrice,
       reorderThreshold: existing.reorderThreshold,
     };
+    // batchNumber is immutable: intentionally omitted from `fields`/patch so it is preserved.
     await ctx.db.patch("products", id, fields);
     await recordAudit(ctx, {
       entityTable: "products",
