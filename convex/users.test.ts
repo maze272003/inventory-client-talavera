@@ -174,3 +174,31 @@ test("users.list returns the roster with totals and is admin-only", async () => 
 
   await expect(cashier.query(api.users.list, {})).rejects.toThrow("Requires admin access");
 });
+
+import { internal } from "./_generated/api";
+
+test("createUserProfile inserts an active profile and a create audit entry", async () => {
+  const t = convexTest(schema, modules);
+  const { userId: adminId, as: admin } = await makeUser(t, { name: "Boss", role: "admin" });
+  const newUserId = await t.run((ctx) => ctx.db.insert("users", { email: "new@shop.local" }));
+
+  await t.mutation(internal.users.createUserProfile, {
+    userId: newUserId,
+    name: "Maria",
+    email: "new@shop.local",
+    role: "cashier",
+    createdBy: adminId,
+  });
+
+  const profile = await t.run((ctx) =>
+    ctx.db.query("userProfiles").withIndex("by_userId", (q) => q.eq("userId", newUserId)).unique(),
+  );
+  expect(profile!.role).toBe("cashier");
+  expect(profile!.disabled).toBe(false);
+  expect(profile!.email).toBe("new@shop.local");
+  expect(profile!.createdBy).toBe(adminId);
+
+  const latest = await admin.query(api.audit.latest, {});
+  expect(latest!.entityTable).toBe("users");
+  expect(latest!.action).toBe("create");
+});

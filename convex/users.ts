@@ -139,6 +139,65 @@ export const assertAdminCaller = query({
   },
 });
 
+export const createUserProfile = internalMutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+    email: v.string(),
+    role: roleValidator,
+    createdBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const profileId = await ctx.db.insert("userProfiles", {
+      userId: args.userId,
+      name: args.name,
+      email: args.email,
+      role: args.role,
+      disabled: false,
+      createdBy: args.createdBy,
+    });
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "create",
+      summary: `Created ${args.role} account ${args.name} (${args.email})`,
+      after: { name: args.name, email: args.email, role: args.role },
+      undoable: false,
+      userId: args.createdBy,
+    });
+    return profileId;
+  },
+});
+
+export const getEmailForUser = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+    const user = await ctx.db.get("users", args.userId);
+    return { email: profile?.email ?? user?.email ?? null, name: profile?.name ?? "Unknown" };
+  },
+});
+
+export const recordPasswordReset = internalMutation({
+  args: { userId: v.id("users"), targetName: v.string() },
+  handler: async (ctx, args) => {
+    const { userId: callerId } = await requireRole(ctx, "admin");
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "password_reset",
+      summary: `Reset password for ${args.targetName}`,
+      undoable: false,
+      userId: callerId,
+    });
+    return null;
+  },
+});
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
