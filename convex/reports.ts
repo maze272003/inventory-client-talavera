@@ -129,6 +129,7 @@ async function rangeTotals(
     .withIndex("by_creation_time", (q) =>
       q.gte("_creationTime", startMs).lte("_creationTime", endMs),
     )
+    // Previous-period baseline capped at MAX_SALES with no separate truncated flag; deltas may under-count only at >5000 prev-period sales.
     .take(MAX_SALES);
   let revenue = 0, profit = 0, units = 0, transactions = 0;
   for (const sale of sales) {

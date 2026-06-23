@@ -40,13 +40,15 @@ function readColors(): ChartColors {
 export function useChartColors(): ChartColors {
   const [colors, setColors] = useState<ChartColors>(DEFAULTS);
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => setColors(readColors());
-    // Read on mount via the media-query change listener pattern (avoids
-    // calling setState synchronously in the effect body).
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
+    if (typeof window === "undefined") return;
+    // This app toggles dark mode by adding/removing the .dark class on <html>
+    // (see ThemeProvider.tsx) — NOT via prefers-color-scheme. Watch the class
+    // attribute with a MutationObserver so charts recolor on manual theme flips.
+    const setColorsHandler = () => setColors(readColors());
+    setColorsHandler(); // read on mount
+    const observer = new MutationObserver(() => setColorsHandler());
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, []);
   return colors;
 }

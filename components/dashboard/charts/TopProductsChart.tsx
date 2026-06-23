@@ -41,8 +41,7 @@ export default function TopProductsChart({
             <XAxis type="number" stroke={c.textMuted} fontSize={12} tickLine={false} tickFormatter={fmt} />
             <YAxis type="category" dataKey="name" stroke={c.textMuted} fontSize={12} tickLine={false} width={110} />
             <Tooltip
-              // eslint-disable-next-line @typescript-eslint/no-unused-vars
-              formatter={(v, _n) => [fmt(Number(v ?? 0)), metric === "revenue" ? "Revenue" : "Units"]}
+              formatter={(v) => [fmt(Number(v ?? 0)), metric === "revenue" ? "Revenue" : "Units"]}
               contentStyle={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 }}
             />
             <Bar dataKey={metric} fill={c.primary} radius={[0, 3, 3, 0]} />

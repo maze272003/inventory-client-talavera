@@ -118,8 +118,6 @@ test("salesSummary rejects non-admin cashier", async () => {
   ).rejects.toThrow();
 });
 
-import { bucketStartForTs } from "./lib/buckets"; // used to reason about buckets in assertions
-
 test("dashboardAnalytics returns KPIs, growth deltas, timeseries, top products, categories", async () => {
   const t = convexTest(schema, modules);
   const admin = await seed(t, "admin");

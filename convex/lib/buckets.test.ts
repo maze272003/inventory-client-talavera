@@ -3,7 +3,6 @@ import { bucketStartForTs, enumerateBuckets, bucketLabel } from "./buckets";
 
 // Philippines is UTC+8 → getTimezoneOffset() === -480
 const PH = -480;
-const DAY = 24 * 60 * 60 * 1000;
 
 test("bucketStartForTs snaps to the local day start (UTC+8)", () => {
   // 2026-06-23T01:00:00+08:00  ==  2026-06-22T17:00:00Z
