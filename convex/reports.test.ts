@@ -72,6 +72,33 @@ test("topProducts returns products ordered by unitsSold desc with correct revenu
   expect(top1[0].name).toEqual("Banana");
 });
 
+async function seedUser(t: ReturnType<typeof convexTest>, name: string, role: "admin" | "cashier") {
+  const userId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: `${name}@a.com` });
+    await ctx.db.insert("userProfiles", { userId: id, name, role, email: `${name}@a.com` });
+    return id;
+  });
+  return { userId, as: t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` }) };
+}
+
+test("cashierPerformance aggregates revenue, profit, units per cashier", async () => {
+  const t = convexTest(schema, modules);
+  const { as: admin } = await seedUser(t, "Boss", "admin");
+  const { userId: cashierId, as: cashier } = await seedUser(t, "Cash", "cashier");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Pop", sku: "P1", category: "Food", costPrice: 2, sellPrice: 5, stockQty: 100, reorderThreshold: 1,
+  });
+  await cashier.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 4 }], cashTendered: 100 });
+
+  const rows = await admin.query(api.reports.cashierPerformance, { startMs: 0, endMs: Number.MAX_SAFE_INTEGER });
+  const row = rows.find((r) => r.cashierId === cashierId)!;
+  expect(row.name).toBe("Cash");
+  expect(row.saleCount).toBe(1);
+  expect(row.revenue).toBe(20); // 4 * 5
+  expect(row.profit).toBe(12); // 4 * (5 - 2)
+  expect(row.units).toBe(4);
+});
+
 // Extra (b): non-admin (cashier) calling salesSummary is rejected
 test("salesSummary rejects non-admin cashier", async () => {
   const t = convexTest(schema, modules);
