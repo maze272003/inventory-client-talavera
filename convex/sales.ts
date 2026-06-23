@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { mutation, query, MutationCtx } from "./_generated/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator, PaginationResult } from "convex/server";
-import { requireUser } from "./lib/auth";
+import { requireUser, requireRole } from "./lib/auth";
+import { recordAudit } from "./lib/audit";
 
 async function nextReceiptNumber(ctx: MutationCtx): Promise<number> {
   const counter = await ctx.db
@@ -59,6 +60,7 @@ export const createSale = mutation({
       cashTendered: args.cashTendered,
       changeGiven,
       cashierId: userId,
+      isArchived: false,
     });
 
     for (const l of lines) {
@@ -84,7 +86,57 @@ export const createSale = mutation({
       });
     }
 
+    await recordAudit(ctx, {
+      entityTable: "sales",
+      entityId: saleId,
+      action: "sale",
+      summary: `Sale receipt #${receiptNumber} (total ${total})`,
+      after: { receiptNumber, total },
+      undoable: false,
+      userId,
+    });
+
     return { saleId, receiptNumber, total, changeGiven };
+  },
+});
+
+export const archive = mutation({
+  args: { saleId: v.id("sales") },
+  handler: async (ctx, args) => {
+    const { userId } = await requireRole(ctx, "admin");
+    const sale = await ctx.db.get("sales", args.saleId);
+    if (!sale) throw new Error("Sale not found");
+    await ctx.db.patch("sales", args.saleId, { isArchived: true });
+    await recordAudit(ctx, {
+      entityTable: "sales",
+      entityId: args.saleId,
+      action: "archive",
+      summary: `Archived sale receipt #${sale.receiptNumber}`,
+      before: { isArchived: sale.isArchived ?? false },
+      after: { isArchived: true },
+      undoable: false,
+      userId,
+    });
+  },
+});
+
+export const restore = mutation({
+  args: { saleId: v.id("sales") },
+  handler: async (ctx, args) => {
+    const { userId } = await requireRole(ctx, "admin");
+    const sale = await ctx.db.get("sales", args.saleId);
+    if (!sale) throw new Error("Sale not found");
+    await ctx.db.patch("sales", args.saleId, { isArchived: false });
+    await recordAudit(ctx, {
+      entityTable: "sales",
+      entityId: args.saleId,
+      action: "restore",
+      summary: `Restored sale receipt #${sale.receiptNumber}`,
+      before: { isArchived: sale.isArchived ?? false },
+      after: { isArchived: false },
+      undoable: false,
+      userId,
+    });
   },
 });
 
@@ -132,13 +184,47 @@ export const listReceipts = query({
     }
 
     if (args.receiptNumber !== undefined) {
+      // receiptNumber is unique; there is no compound index with isArchived,
+      // so read the matching page and drop any archived row in memory.
       const result = await ctx.db
         .query("sales")
         .withIndex("by_receiptNumber", (q) => q.eq("receiptNumber", args.receiptNumber!))
         .paginate(args.paginationOpts);
-      return enrichPage(result);
+      const filtered = {
+        ...result,
+        page: result.page.filter((s) => s.isArchived !== true),
+      };
+      return enrichPage(filtered);
     }
-    const result = await ctx.db.query("sales").order("desc").paginate(args.paginationOpts);
+    const result = await ctx.db
+      .query("sales")
+      .withIndex("by_archived", (q) => q.eq("isArchived", false))
+      .order("desc")
+      .paginate(args.paginationOpts);
     return enrichPage(result);
+  },
+});
+
+export const listArchivedReceipts = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+
+    const result = await ctx.db
+      .query("sales")
+      .withIndex("by_archived", (q) => q.eq("isArchived", true))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    const page = await Promise.all(
+      result.page.map(async (sale) => {
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("by_userId", (q) => q.eq("userId", sale.cashierId))
+          .unique();
+        return { ...sale, cashierName: profile?.name ?? "Unknown" };
+      }),
+    );
+    return { ...result, page };
   },
 });

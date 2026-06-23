@@ -57,7 +57,10 @@ export default defineSchema({
     cashTendered: v.number(),
     changeGiven: v.number(),
     cashierId: v.id("users"),
-  }).index("by_receiptNumber", ["receiptNumber"]),
+    isArchived: v.optional(v.boolean()),
+  })
+    .index("by_receiptNumber", ["receiptNumber"])
+    .index("by_archived", ["isArchived"]),
 
   saleItems: defineTable({
     saleId: v.id("sales"),
@@ -86,5 +89,28 @@ export default defineSchema({
     total: v.number(),
     itemCount: v.number(),
     userId: v.id("users"),
-  }).index("by_supplier", ["supplierName"]),
+    isArchived: v.optional(v.boolean()),
+  })
+    .index("by_supplier", ["supplierName"])
+    .index("by_archived", ["isArchived"]),
+
+  auditLog: defineTable({
+    entityTable: v.string(),
+    entityId: v.string(),
+    action: v.union(
+      v.literal("create"),
+      v.literal("update"),
+      v.literal("archive"),
+      v.literal("restore"),
+      v.literal("sale"),
+      v.literal("stock_in"),
+      v.literal("adjustment"),
+    ),
+    summary: v.string(),
+    before: v.optional(v.any()),
+    after: v.optional(v.any()),
+    undoable: v.boolean(),
+    reverted: v.boolean(),
+    userId: v.id("users"),
+  }).index("by_reverted", ["reverted"]),
 });

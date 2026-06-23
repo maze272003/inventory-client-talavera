@@ -3,6 +3,7 @@ import { mutation, query, QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { requireRole, requireUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
+import { recordAudit } from "./lib/audit";
 
 async function withImageUrl(ctx: QueryCtx, product: Doc<"products">) {
   const imageUrl = product.imageId ? await ctx.storage.getUrl(product.imageId) : null;
@@ -35,6 +36,16 @@ export const create = mutation({
         userId,
       });
     }
+    const after = await ctx.db.get("products", id);
+    await recordAudit(ctx, {
+      entityTable: "products",
+      entityId: id,
+      action: "create",
+      summary: `Created product ${args.name}`,
+      after,
+      undoable: true,
+      userId,
+    });
     return id;
   },
 });
@@ -52,17 +63,52 @@ export const update = mutation({
     reorderThreshold: v.number(),
   },
   handler: async (ctx, args) => {
-    await requireRole(ctx, "admin");
+    const { userId } = await requireRole(ctx, "admin");
     const { id, ...fields } = args;
+    const existing = await ctx.db.get("products", id);
+    if (!existing) throw new Error("Product not found");
+    // Snapshot only the mutable fields so an undo can patch them back exactly.
+    const before = {
+      name: existing.name,
+      sku: existing.sku,
+      category: existing.category,
+      model: existing.model,
+      imageId: existing.imageId,
+      costPrice: existing.costPrice,
+      sellPrice: existing.sellPrice,
+      reorderThreshold: existing.reorderThreshold,
+    };
     await ctx.db.patch("products", id, fields);
+    await recordAudit(ctx, {
+      entityTable: "products",
+      entityId: id,
+      action: "update",
+      summary: `Updated product ${fields.name}`,
+      before,
+      after: fields,
+      undoable: true,
+      userId,
+    });
   },
 });
 
 export const setActive = mutation({
   args: { id: v.id("products"), isActive: v.boolean() },
   handler: async (ctx, args) => {
-    await requireRole(ctx, "admin");
+    const { userId } = await requireRole(ctx, "admin");
+    const existing = await ctx.db.get("products", args.id);
+    if (!existing) throw new Error("Product not found");
     await ctx.db.patch("products", args.id, { isActive: args.isActive });
+    await recordAudit(ctx, {
+      entityTable: "products",
+      entityId: args.id,
+      action: args.isActive ? "restore" : "archive",
+      summary: `${args.isActive ? "Restored" : "Archived"} product ${existing.name}`,
+      before: { isActive: existing.isActive },
+      after: { isActive: args.isActive },
+      undoable: true,
+      userId,
+    });
   },
 });
 
@@ -86,14 +132,39 @@ export const list = query({
         )
         .paginate(args.paginationOpts);
     } else if (args.category) {
+      // No compound index on (category, isActive); when activeOnly is set the
+      // search/by_active branches cover the indexed cases. Here we read the
+      // category page and drop inactive rows in memory.
       result = await ctx.db
         .query("products")
         .withIndex("by_category", (q) => q.eq("category", args.category!))
         .order("desc")
         .paginate(args.paginationOpts);
+      if (args.activeOnly) {
+        result = { ...result, page: result.page.filter((p) => p.isActive) };
+      }
+    } else if (args.activeOnly) {
+      result = await ctx.db
+        .query("products")
+        .withIndex("by_active", (q) => q.eq("isActive", true))
+        .order("desc")
+        .paginate(args.paginationOpts);
     } else {
       result = await ctx.db.query("products").order("desc").paginate(args.paginationOpts);
     }
+    return { ...result, page: await Promise.all(result.page.map((p) => withImageUrl(ctx, p))) };
+  },
+});
+
+export const listArchived = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+    const result = await ctx.db
+      .query("products")
+      .withIndex("by_active", (q) => q.eq("isActive", false))
+      .order("desc")
+      .paginate(args.paginationOpts);
     return { ...result, page: await Promise.all(result.page.map((p) => withImageUrl(ctx, p))) };
   },
 });

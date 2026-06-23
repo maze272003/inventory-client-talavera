@@ -5,6 +5,7 @@ import { createAccount } from "@convex-dev/auth/server";
 
 const SEED_USERS = [
   { email: "admin@shop.local", password: "admin12345", name: "Store Admin", role: "admin" as const },
+  { email: "sanped1914@gmail.com", password: "sanped1914", name: "Store Admin", role: "admin" as const },
   { email: "cashier@shop.local", password: "cashier12345", name: "Store Cashier", role: "cashier" as const },
 ];
 

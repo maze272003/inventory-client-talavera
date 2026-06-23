@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { requireRole } from "./lib/auth";
+import { recordAudit } from "./lib/audit";
 
 export const stockIn = mutation({
   args: {
@@ -22,6 +23,16 @@ export const stockIn = mutation({
       quantityDelta: args.quantity,
       balanceAfter,
       unitCost: args.unitCost ?? product.costPrice,
+      userId,
+    });
+    await recordAudit(ctx, {
+      entityTable: "products",
+      entityId: args.productId,
+      action: "stock_in",
+      summary: `Stocked in ${args.quantity} of ${product.name}`,
+      before: { stockQty: product.stockQty },
+      after: { stockQty: balanceAfter },
+      undoable: false,
       userId,
     });
   },
@@ -46,6 +57,16 @@ export const adjust = mutation({
       quantityDelta: delta,
       balanceAfter: args.newQuantity,
       reason: args.reason,
+      userId,
+    });
+    await recordAudit(ctx, {
+      entityTable: "products",
+      entityId: args.productId,
+      action: "adjustment",
+      summary: `Adjusted ${product.name} to ${args.newQuantity} (${args.reason})`,
+      before: { stockQty: product.stockQty },
+      after: { stockQty: args.newQuantity },
+      undoable: false,
       userId,
     });
   },

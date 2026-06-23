@@ -61,7 +61,10 @@ const groups: NavGroup[] = [
   },
   {
     label: "Insights",
-    links: [{ href: "/reports", label: "Reports", icon: "bar-chart", adminOnly: true }],
+    links: [
+      { href: "/reports", label: "Reports", icon: "bar-chart", adminOnly: true },
+      { href: "/audit", label: "Audit Log", icon: "refresh", adminOnly: true },
+    ],
   },
 ];
 

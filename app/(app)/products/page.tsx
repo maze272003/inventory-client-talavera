@@ -12,6 +12,7 @@ import {
   Button,
   Card,
   ConfirmDialog,
+  Dialog,
   EmptyState,
   Icon,
   Input,
@@ -50,13 +51,25 @@ export default function ProductsPage() {
   const [editProduct, setEditProduct] = useState<ProductDoc | null>(null);
   const [togglingId, setTogglingId] = useState<Id<"products"> | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<ProductDoc | null>(null);
+  const [archivedOpen, setArchivedOpen] = useState(false);
+  const [restoringId, setRestoringId] = useState<Id<"products"> | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const setActive = useMutation(api.products.setActive);
 
+  const {
+    results: archivedResults,
+    status: archivedStatus,
+    loadMore: loadMoreArchived,
+  } = usePaginatedQuery(
+    api.products.listArchived,
+    archivedOpen ? {} : "skip",
+    { initialNumItems: 20 }
+  );
+
   const { results, status, loadMore } = usePaginatedQuery(
     api.products.list,
-    { search, category },
+    { search, category, activeOnly: true },
     { initialNumItems: 20 }
   );
 
@@ -130,16 +143,32 @@ export default function ProductsPage() {
     try {
       await setActive({ id: product._id, isActive: !product.isActive });
       success(
-        product.isActive ? "Product deactivated" : "Product activated",
+        product.isActive ? "Product archived" : "Product restored",
         product.name
       );
     } catch (err: unknown) {
       errorToast(
-        "Could not update status",
+        product.isActive ? "Could not archive product" : "Could not restore product",
         err instanceof Error ? err.message : "Failed to update product status."
       );
     } finally {
       setTogglingId(null);
+    }
+  }
+
+  async function restoreProduct(product: ProductDoc) {
+    if (restoringId !== null) return;
+    setRestoringId(product._id);
+    try {
+      await setActive({ id: product._id, isActive: true });
+      success("Product restored", product.name);
+    } catch (err: unknown) {
+      errorToast(
+        "Could not restore product",
+        err instanceof Error ? err.message : "Failed to restore product."
+      );
+    } finally {
+      setRestoringId(null);
     }
   }
 
@@ -328,7 +357,7 @@ export default function ProductsPage() {
               }
             }}
           >
-            {product.isActive ? "Deactivate" : "Activate"}
+            {product.isActive ? "Archive" : "Restore"}
           </Button>
         </div>
       ),
@@ -356,6 +385,13 @@ export default function ProductsPage() {
               leftIcon={<Icon name="printer" className="w-4 h-4" />}
             >
               Print / PDF
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setArchivedOpen(true)}
+              leftIcon={<Icon name="package" className="w-4 h-4" />}
+            >
+              Archived Products
             </Button>
             <Button
               onClick={openAdd}
@@ -512,15 +548,94 @@ export default function ProductsPage() {
           await toggleActive(confirmTarget);
           setConfirmTarget(null);
         }}
-        title="Deactivate product?"
+        title="Archive product?"
         description={
           confirmTarget
-            ? `"${confirmTarget.name}" will be hidden from active inventory and the POS. You can reactivate it later.`
+            ? `"${confirmTarget.name}" will be hidden from active inventory and the POS. You can restore it later from Archived Products.`
             : undefined
         }
-        confirmLabel="Deactivate"
+        confirmLabel="Archive"
         loading={confirmTarget !== null && togglingId === confirmTarget._id}
       />
+
+      <Dialog
+        open={archivedOpen}
+        onClose={() => setArchivedOpen(false)}
+        title="Archived products"
+        description="Products hidden from active inventory and the POS. Restore one to return it to your catalog."
+        size="lg"
+      >
+        {archivedStatus === "LoadingFirstPage" ? (
+          <div className="space-y-3">
+            <Skeleton height={56} />
+            <Skeleton height={56} />
+            <Skeleton height={56} />
+          </div>
+        ) : (archivedResults as ProductDoc[]).length === 0 ? (
+          <EmptyState
+            icon="package"
+            title="No archived products"
+            description="Products you archive will appear here."
+          />
+        ) : (
+          <div>
+            <ul className="divide-y divide-border">
+              {(archivedResults as ProductDoc[]).map((product) => (
+                <li
+                  key={product._id}
+                  className="flex items-center gap-3 py-row"
+                >
+                  <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-2 flex items-center justify-center flex-shrink-0 text-text-muted">
+                    {product.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Icon name="package" className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-text truncate">
+                      {product.name}
+                    </p>
+                    <p className="text-xs text-text-muted truncate">
+                      <span className="font-mono">{product.sku}</span>
+                      <span aria-hidden="true"> · </span>
+                      {product.category}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    loading={restoringId === product._id}
+                    disabled={restoringId === product._id}
+                    onClick={() => void restoreProduct(product)}
+                    leftIcon={<Icon name="refresh" className="w-4 h-4" />}
+                  >
+                    Restore
+                  </Button>
+                </li>
+              ))}
+            </ul>
+
+            {archivedStatus === "CanLoadMore" && (
+              <div className="flex justify-center pt-row">
+                <Button variant="ghost" onClick={() => loadMoreArchived(20)}>
+                  Load more
+                </Button>
+              </div>
+            )}
+            {archivedStatus === "LoadingMore" && (
+              <div className="flex justify-center pt-row">
+                <Skeleton height={20} width={120} />
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
     </div>
   );
 }

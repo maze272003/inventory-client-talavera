@@ -8,11 +8,13 @@
  * @module
  */
 
+import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
 import type * as databaseMaintenance from "../databaseMaintenance.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
+import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as products from "../products.js";
 import type * as purchases from "../purchases.js";
@@ -28,11 +30,13 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  audit: typeof audit;
   auth: typeof auth;
   databaseMaintenance: typeof databaseMaintenance;
   files: typeof files;
   http: typeof http;
   inventory: typeof inventory;
+  "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
   products: typeof products;
   purchases: typeof purchases;
