@@ -66,6 +66,12 @@ const groups: NavGroup[] = [
       { href: "/audit", label: "Audit Log", icon: "refresh", adminOnly: true },
     ],
   },
+  {
+    label: "Admin",
+    links: [
+      { href: "/users", label: "Users", icon: "user", adminOnly: true },
+    ],
+  },
 ];
 
 /** Cashier essentials surfaced in the phone bottom tab bar (thumb-reachable). */
