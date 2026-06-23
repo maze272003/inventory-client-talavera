@@ -34,6 +34,7 @@ type ProductDoc = {
   stockQty: number;
   reorderThreshold: number;
   isActive: boolean;
+  batchNumber?: string;
   imageId?: Id<"_storage">;
   imageUrl?: string | null;
 };
@@ -180,6 +181,7 @@ export default function ProductsPage() {
     { key: "name", header: "Name" },
     { key: "model", header: "Model" },
     { key: "sku", header: "SKU" },
+    { key: "batchNumber", header: "Batch" },
     { key: "category", header: "Category" },
     { key: "costPrice", header: "Cost Price" },
     { key: "sellPrice", header: "Sell Price" },
@@ -193,6 +195,7 @@ export default function ProductsPage() {
       name: p.name,
       model: p.model ?? "",
       sku: p.sku,
+      batchNumber: p.batchNumber ?? "",
       category: p.category,
       costPrice: p.costPrice,
       sellPrice: p.sellPrice,
@@ -261,6 +264,13 @@ export default function ProductsPage() {
       header: "SKU",
       cell: (product) => (
         <span className="text-text-muted font-mono text-xs">{product.sku}</span>
+      ),
+    },
+    {
+      key: "batchNumber",
+      header: "Batch",
+      cell: (product) => (
+        <span className="text-text-muted font-mono text-xs">{product.batchNumber}</span>
       ),
     },
     {
@@ -502,6 +512,7 @@ export default function ProductsPage() {
               <tr className="border-b-2 border-text">
                 <th className="text-left py-1 pr-2">Name</th>
                 <th className="text-left py-1 pr-2">SKU</th>
+                <th className="text-left py-1 pr-2">Batch</th>
                 <th className="text-left py-1 pr-2">Category</th>
                 <th className="text-right py-1 pr-2">Cost</th>
                 <th className="text-right py-1 pr-2">Sell</th>
@@ -517,6 +528,7 @@ export default function ProductsPage() {
                   <tr key={p._id} className="border-b border-border">
                     <td className="py-1 pr-2 font-medium">{p.name}{p.model ? ` (${p.model})` : ""}</td>
                     <td className="py-1 pr-2 font-mono">{p.sku}</td>
+                    <td className="py-1 pr-2 font-mono">{p.batchNumber}</td>
                     <td className="py-1 pr-2">{p.category}</td>
                     <td className="py-1 pr-2 text-right">{formatPeso(p.costPrice)}</td>
                     <td className="py-1 pr-2 text-right">{formatPeso(p.sellPrice)}</td>

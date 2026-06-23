@@ -24,6 +24,7 @@ type ProductDoc = {
   stockQty: number;
   reorderThreshold: number;
   isActive: boolean;
+  batchNumber?: string;
   imageId?: Id<"_storage">;
   imageUrl?: string | null;
 };
@@ -237,6 +238,21 @@ export default function ProductForm({ product, open, onClose }: Props) {
               onChange={(e) => setCategory(e.target.value)}
               placeholder="e.g. Tiles"
             />
+          </Field>
+          <Field label="Batch number">
+            {isEdit ? (
+              <Input
+                value={product.batchNumber ?? ""}
+                disabled
+                className="font-mono"
+              />
+            ) : (
+              <Input
+                value=""
+                disabled
+                placeholder="Auto-generated on save"
+              />
+            )}
           </Field>
           <div className="col-span-2">
             <Field label="Model">

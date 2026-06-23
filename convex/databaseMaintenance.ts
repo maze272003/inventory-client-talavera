@@ -3,6 +3,7 @@ import { internalMutation, mutation, MutationCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { TableNames } from "./_generated/dataModel";
 import { requireRole } from "./lib/auth";
+import { formatBatchNumber, nextBatchSequence } from "./lib/batch";
 
 const TABLES: TableNames[] = [
   "auditLog", "saleItems", "sales", "inventoryLedger", "products", "counters",
@@ -107,6 +108,46 @@ export const backfillUserEmails = mutation({
 export const backfillUserEmailsInternal = internalMutation({
   args: {},
   handler: async (ctx) => doBackfillUserEmails(ctx),
+});
+
+async function doBackfillBatchNumbers(ctx: MutationCtx) {
+  let patched = 0;
+  // eq("batchNumber", undefined) matches un-numbered rows; the index then yields
+  // them in ascending _creationTime order, so the oldest product gets the lowest
+  // sequence. Patching a row removes it from this set, so the loop terminates.
+  let batch = await ctx.db
+    .query("products")
+    .withIndex("by_batchNumber", (q) => q.eq("batchNumber", undefined))
+    .take(200);
+  while (batch.length > 0) {
+    for (const p of batch) {
+      const seq = await nextBatchSequence(ctx);
+      // Use each product's own creation time for the date portion, so backfilled
+      // codes reflect when the product was actually added.
+      await ctx.db.patch("products", p._id, {
+        batchNumber: formatBatchNumber(seq, p._creationTime),
+      });
+      patched++;
+    }
+    batch = await ctx.db
+      .query("products")
+      .withIndex("by_batchNumber", (q) => q.eq("batchNumber", undefined))
+      .take(200);
+  }
+  return { patched };
+}
+
+export const backfillBatchNumbers = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireRole(ctx, "admin");
+    return doBackfillBatchNumbers(ctx);
+  },
+});
+
+export const backfillBatchNumbersInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => doBackfillBatchNumbers(ctx),
 });
 
 export const resetWithMasterSeed = internalMutation({

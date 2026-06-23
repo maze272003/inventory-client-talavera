@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as inventory from "../inventory.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_batch from "../lib/batch.js";
 import type * as lib_buckets from "../lib/buckets.js";
 import type * as products from "../products.js";
 import type * as purchases from "../purchases.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   inventory: typeof inventory;
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
+  "lib/batch": typeof lib_batch;
   "lib/buckets": typeof lib_buckets;
   products: typeof products;
   purchases: typeof purchases;

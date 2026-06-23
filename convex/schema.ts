@@ -24,6 +24,7 @@ export default defineSchema({
   products: defineTable({
     name: v.string(),
     sku: v.string(),
+    batchNumber: v.optional(v.string()),
     category: v.string(),
     model: v.optional(v.string()),
     imageId: v.optional(v.id("_storage")),
@@ -34,6 +35,7 @@ export default defineSchema({
     isActive: v.boolean(),
   })
     .index("by_sku", ["sku"])
+    .index("by_batchNumber", ["batchNumber"])
     .index("by_category", ["category"])
     .index("by_active", ["isActive"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["isActive"] }),
