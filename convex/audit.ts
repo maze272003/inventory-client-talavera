@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { Doc, Id } from "./_generated/dataModel";
-import { requireRole, requireUser } from "./lib/auth";
+import { requireRole } from "./lib/auth";
 
 async function enrichEntry(ctx: QueryCtx, entry: Doc<"auditLog">) {
   let userName = entry.actorName;
@@ -29,7 +29,7 @@ export const list = query({
     endMs: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await requireUser(ctx);
+    await requireRole(ctx, "admin");
 
     const base = args.userId
       ? ctx.db.query("auditLog").withIndex("by_userId", (q) => q.eq("userId", args.userId!)).order("desc")
@@ -52,7 +52,7 @@ export const list = query({
 export const latest = query({
   args: {},
   handler: async (ctx) => {
-    await requireUser(ctx);
+    await requireRole(ctx, "admin");
     const entry = await ctx.db
       .query("auditLog")
       .withIndex("by_reverted", (q) => q.eq("reverted", false))

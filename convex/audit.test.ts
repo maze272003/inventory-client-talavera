@@ -266,6 +266,17 @@ test("revertLatest requires admin", async () => {
   ).rejects.toThrow("Requires admin access");
 });
 
+test("audit.list and audit.latest reject a cashier with admin-access error", async () => {
+  const t = convexTest(schema, modules);
+  const cashier = await asCashier(t);
+  await expect(
+    cashier.query(api.audit.list, { paginationOpts: { numItems: 10, cursor: null } }),
+  ).rejects.toThrow("Requires admin access");
+  await expect(
+    cashier.query(api.audit.latest, {}),
+  ).rejects.toThrow("Requires admin access");
+});
+
 test("backfillArchiveFlags sets isArchived:false on legacy rows (idempotent)", async () => {
   const t = convexTest(schema, modules);
   const admin = await asAdmin(t);
