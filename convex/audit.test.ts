@@ -302,3 +302,17 @@ test("backfillArchiveFlags sets isArchived:false on legacy rows (idempotent)", a
   expect(res2.purchasesPatched).toBe(0);
   expect(res2.salesPatched).toBe(0);
 });
+
+test("recordAudit snapshots actorName and actorEmail on the entry", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t, "Snapshotter");
+  await admin.mutation(api.products.create, {
+    name: "Tin", sku: "T1", category: "C",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const entry = await t.run(async (ctx) =>
+    (await ctx.db.query("auditLog").order("desc").take(1))[0],
+  );
+  expect(entry.actorName).toBe("Snapshotter");
+  expect(entry.actorEmail).toBe("Snapshotter@a.com");
+});
