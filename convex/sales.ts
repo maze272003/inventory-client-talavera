@@ -158,7 +158,16 @@ export const getSale = query({
         return { ...it, imageUrl };
       })
     );
-    return { sale, items: itemsWithImages };
+    const cashierProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", sale.cashierId))
+      .unique();
+    const cashierUser = await ctx.db.get("users", sale.cashierId);
+    const cashier = {
+      name: cashierProfile?.name ?? "Unknown",
+      email: cashierProfile?.email ?? cashierUser?.email ?? null,
+    };
+    return { sale, items: itemsWithImages, cashier };
   },
 });
 

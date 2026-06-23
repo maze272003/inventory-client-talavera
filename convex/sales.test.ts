@@ -134,6 +134,19 @@ test("merges duplicate cart lines correctly", async () => {
   expect(p?.stockQty).toEqual(5);
 });
 
+// Task 15: getSale returns cashier name and email
+test("getSale returns the cashier name and email", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Tea", sku: "te1", category: "Drinks", costPrice: 1, sellPrice: 3, stockQty: 10, reorderThreshold: 1,
+  });
+  const res = await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 1 }], cashTendered: 5 });
+  const detail = await admin.query(api.sales.getSale, { saleId: res.saleId });
+  expect(detail!.cashier.name).toBe("admin");
+  expect(detail!.cashier.email).toBe("admin@a.com");
+});
+
 // Extra (c): inventoryLedger gets a "sale" row with negative quantityDelta and correct balanceAfter
 test("createSale writes sale-type ledger row with negative quantityDelta and correct balanceAfter", async () => {
   const t = convexTest(schema, modules);

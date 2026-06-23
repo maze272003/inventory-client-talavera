@@ -47,7 +47,7 @@ export default function Receipt({ saleId }: Props) {
     );
   }
 
-  const { sale, items } = data;
+  const { sale, items, cashier } = data;
 
   function handlePrint() {
     if (typeof window !== "undefined") {
@@ -87,6 +87,15 @@ export default function Receipt({ saleId }: Props) {
           <div className="flex justify-between">
             <span>Date:</span>
             <span className="tabular-nums">{formatDate(sale._creationTime)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Cashier:</span>
+            <div className="text-right">
+              <div>{cashier.name}</div>
+              {cashier.email && (
+                <div className="text-text-muted text-xs">{cashier.email}</div>
+              )}
+            </div>
           </div>
         </div>
 
