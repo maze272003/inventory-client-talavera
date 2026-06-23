@@ -117,3 +117,92 @@ test("salesSummary rejects non-admin cashier", async () => {
     cashier.query(api.reports.salesSummary, { startMs: 0, endMs: 1e15 }),
   ).rejects.toThrow();
 });
+
+test("dashboardAnalytics returns KPIs, growth deltas, timeseries, top products, categories", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Soda", sku: "s1", category: "Drinks",
+    costPrice: 2, sellPrice: 5, stockQty: 100, reorderThreshold: 5,
+  });
+  // Two sales "now"
+  await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 4 }], cashTendered: 100 });
+  await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 2 }], cashTendered: 100 });
+
+  const res = await admin.query(api.reports.dashboardAnalytics, {
+    startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0,
+  });
+
+  expect(res.kpis.revenue.value).toBe(30);  // (4+2)*5
+  expect(res.kpis.profit.value).toBe(18);   // (4+2)*(5-2)
+  expect(res.kpis.units.value).toBe(6);
+  expect(res.kpis.transactions.value).toBe(2);
+  expect(res.kpis.revenue.previous).toBe(0);
+  expect(res.kpis.revenue.deltaPct).toBeNull(); // previous 0 → null
+
+  // timeseries non-empty, totals reconcile
+  const tsRevenue = res.timeseries.reduce((s, b) => s + b.revenue, 0);
+  expect(tsRevenue).toBe(30);
+
+  expect(res.topProducts[0].name).toBe("Soda");
+  expect(res.topProducts[0].units).toBe(6);
+  expect(res.categoryBreakdown[0].category).toBe("Drinks");
+  expect(res.categoryBreakdown[0].revenue).toBe(30);
+  expect(res.truncated).toBe(false);
+});
+
+test("dashboardAnalytics excludes archived sales and is admin-only", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const cashier = await seed(t, "cashier");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Chip", sku: "c1", category: "Snacks",
+    costPrice: 1, sellPrice: 3, stockQty: 50, reorderThreshold: 5,
+  });
+  const sale = await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 1 }], cashTendered: 10 });
+  // archive the sale directly
+  await t.run(async (ctx) => {
+    const s = await ctx.db.query("sales").withIndex("by_receiptNumber").first();
+    if (s) await ctx.db.patch("sales", s._id, { isArchived: true });
+    void sale;
+  });
+
+  const res = await admin.query(api.reports.dashboardAnalytics, {
+    startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0,
+  });
+  expect(res.kpis.revenue.value).toBe(0);
+  expect(res.kpis.transactions.value).toBe(0);
+
+  await expect(
+    cashier.query(api.reports.dashboardAnalytics, { startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0 }),
+  ).rejects.toThrow();
+});
+
+test("cashFlow buckets sales revenue against purchase spend", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Box", sku: "bx1", category: "Supplies",
+    costPrice: 5, sellPrice: 12, stockQty: 100, reorderThreshold: 5,
+  });
+  await admin.mutation(api.sales.createSale, { items: [{ productId: pid, quantity: 2 }], cashTendered: 100 });
+
+  // A purchase whose purchaseDate is "now" (in range)
+  await t.run(async (ctx) => {
+    const adminId = (await ctx.db.query("userProfiles").first())!.userId;
+    const fileId = await ctx.storage.store(new Blob(["x"]));
+    await ctx.db.insert("purchases", {
+      supplierName: "Acme", purchaseDate: Date.now(), total: 500, itemCount: 1,
+      userId: adminId, fileId: fileId,
+    });
+  });
+
+  const res = await admin.query(api.reports.cashFlow, {
+    startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0,
+  });
+  expect(res.totals.revenue).toBe(24); // 2*12
+  expect(res.totals.spend).toBe(500);
+  expect(res.truncated).toBe(false);
+  const withRevenue = res.buckets.find((b) => b.revenue > 0);
+  expect(withRevenue).toBeDefined();
+});

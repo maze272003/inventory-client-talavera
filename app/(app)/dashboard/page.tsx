@@ -1,45 +1,48 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatPeso, formatDate } from "@/lib/format";
+import {
+  type Preset, presetRange, parseLocalDate, startOfDay, endOfDay,
+  deriveGranularity, tzOffsetMinutes,
+} from "@/lib/dateRange";
 import Link from "next/link";
 import {
-  Badge,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  EmptyState,
-  PageHeader,
-  Skeleton,
-  SkeletonText,
+  Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader,
+  Select, Skeleton, SkeletonText,
 } from "@/components/ui";
+import DateRangePicker from "@/components/DateRangePicker";
+import ChartFrame from "@/components/dashboard/charts/ChartFrame";
+import RevenueProfitTrendChart from "@/components/dashboard/charts/RevenueProfitTrendChart";
+import AvgTransactionChart from "@/components/dashboard/charts/AvgTransactionChart";
+import MarginTrendChart from "@/components/dashboard/charts/MarginTrendChart";
+import TopProductsChart, { type TopMetric } from "@/components/dashboard/charts/TopProductsChart";
+import CategoryDonutChart from "@/components/dashboard/charts/CategoryDonutChart";
+import CashFlowChart from "@/components/dashboard/charts/CashFlowChart";
 
-function todayRange(): { startMs: number; endMs: number } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-  return { startMs: start.getTime(), endMs: now.getTime() };
+function deltaTone(deltaPct: number | null): { text: string; cls: string } {
+  if (deltaPct === null) return { text: "—", cls: "text-text-muted" };
+  const pct = `${deltaPct >= 0 ? "↑" : "↓"} ${Math.abs(deltaPct * 100).toFixed(0)}%`;
+  return { text: pct, cls: deltaPct >= 0 ? "text-success" : "text-danger" };
 }
 
-interface KpiCardProps {
-  label: string;
-  value: string;
-  loading?: boolean;
-}
-
-function KpiCard({ label, value, loading }: KpiCardProps) {
+function KpiCard({
+  label, value, deltaPct, loading,
+}: { label: string; value: string; deltaPct?: number | null; loading?: boolean }) {
+  const tone = deltaPct === undefined ? null : deltaTone(deltaPct);
   return (
     <Card>
       <CardBody className="flex flex-col gap-1">
-        <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">
-          {label}
-        </span>
+        <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">{label}</span>
         {loading ? (
           <Skeleton height={32} width="70%" />
         ) : (
-          <span className="text-2xl font-bold text-text tabular-nums">{value}</span>
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl font-bold text-text tabular-nums">{value}</span>
+            {tone && <span className={`text-xs font-semibold ${tone.cls}`}>{tone.text}</span>}
+          </div>
         )}
       </CardBody>
     </Card>
@@ -50,12 +53,42 @@ export default function DashboardPage() {
   const currentUser = useQuery(api.users.currentUser);
   const isAdmin = currentUser?.role === "admin";
 
-  const range = useMemo(() => todayRange(), []);
+  const [preset, setPreset] = useState<Preset>("30d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [topMetric, setTopMetric] = useState<TopMetric>("units");
 
-  const summary = useQuery(
-    api.reports.salesSummary,
-    isAdmin ? { startMs: range.startMs, endMs: range.endMs } : "skip",
-  );
+  const range = useMemo(() => {
+    if (preset === "custom") {
+      const from = parseLocalDate(customFrom);
+      const to = parseLocalDate(customTo);
+      if (from && to) return { startMs: startOfDay(from).getTime(), endMs: endOfDay(to).getTime() };
+      return presetRange("30d");
+    }
+    return presetRange(preset);
+  }, [preset, customFrom, customTo]);
+
+  const granularity = useMemo(() => deriveGranularity(range.startMs, range.endMs), [range]);
+  const queryArgs = isAdmin
+    ? { startMs: range.startMs, endMs: range.endMs, granularity, tzOffsetMinutes: tzOffsetMinutes() }
+    : "skip" as const;
+
+  const analytics = useQuery(api.reports.dashboardAnalytics, queryArgs);
+  const cash = useQuery(api.reports.cashFlow, queryArgs);
+
+  const presets: { value: Preset; label: string }[] = [
+    { value: "today", label: "Today" },
+    { value: "7d", label: "Last 7 days" },
+    { value: "30d", label: "Last 30 days" },
+    { value: "90d", label: "Last 90 days" },
+    { value: "year", label: "This year" },
+    { value: "custom", label: "Custom" },
+  ];
+
+  const ts = analytics?.timeseries ?? [];
+  const trendData = ts.map((b) => ({ label: b.label, revenue: b.revenue, profit: b.profit }));
+  const aovData = ts.map((b) => ({ label: b.label, transactions: b.transactions, avg: b.transactions > 0 ? b.revenue / b.transactions : 0 }));
+  const marginData = ts.map((b) => ({ label: b.label, marginPct: b.marginPct }));
 
   const lowStockProducts = useQuery(api.products.lowStock, {});
 
@@ -102,35 +135,68 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle={
           isAdmin
-            ? "Admin overview — today so far"
+            ? "Business overview"
             : `Welcome back, ${currentUser?.name ?? "cashier"}`
         }
       />
 
-      {/* Admin KPI cards */}
       {isAdmin && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            label="Today's Revenue"
-            value={summary ? formatPeso(summary.revenue) : "—"}
-            loading={summary === undefined}
-          />
-          <KpiCard
-            label="Today's Profit"
-            value={summary ? formatPeso(summary.profit) : "—"}
-            loading={summary === undefined}
-          />
-          <KpiCard
-            label="Units Sold"
-            value={summary ? String(summary.unitsSold) : "—"}
-            loading={summary === undefined}
-          />
-          <KpiCard
-            label="Transactions"
-            value={summary ? String(summary.saleCount) : "—"}
-            loading={summary === undefined}
-          />
-        </div>
+        <>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <Select
+              value={preset}
+              onChange={(e) => setPreset(e.target.value as Preset)}
+              className="w-full sm:w-56"
+            >
+              {presets.map((p) => (
+                <option key={p.value} value={p.value}>{p.label}</option>
+              ))}
+            </Select>
+            {preset === "custom" && (
+              <div className="w-full sm:w-auto">
+                <DateRangePicker from={customFrom} to={customTo} onFromChange={setCustomFrom} onToChange={setCustomTo} />
+              </div>
+            )}
+          </div>
+
+          {analytics?.truncated && (
+            <p className="text-xs text-text-muted">
+              Showing the most recent 5,000 sales in this range. Narrow the range for exact totals.
+            </p>
+          )}
+
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <KpiCard label="Revenue" value={analytics ? formatPeso(analytics.kpis.revenue.value) : "—"} deltaPct={analytics?.kpis.revenue.deltaPct ?? null} loading={analytics === undefined} />
+            <KpiCard label="Profit" value={analytics ? formatPeso(analytics.kpis.profit.value) : "—"} deltaPct={analytics?.kpis.profit.deltaPct ?? null} loading={analytics === undefined} />
+            <KpiCard label="Units Sold" value={analytics ? String(analytics.kpis.units.value) : "—"} deltaPct={analytics?.kpis.units.deltaPct ?? null} loading={analytics === undefined} />
+            <KpiCard label="Transactions" value={analytics ? String(analytics.kpis.transactions.value) : "—"} deltaPct={analytics?.kpis.transactions.deltaPct ?? null} loading={analytics === undefined} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <ChartFrame title="Revenue & Profit" className="xl:col-span-2" loading={analytics === undefined} empty={trendData.length === 0}>
+              <RevenueProfitTrendChart data={trendData} />
+            </ChartFrame>
+            <ChartFrame
+              title="Top Products"
+              loading={analytics === undefined}
+              empty={(analytics?.topProducts.length ?? 0) === 0}
+            >
+              <TopProductsChart data={analytics?.topProducts ?? []} metric={topMetric} onMetricChange={setTopMetric} />
+            </ChartFrame>
+            <ChartFrame title="Sales by Category" loading={analytics === undefined} empty={(analytics?.categoryBreakdown.length ?? 0) === 0}>
+              <CategoryDonutChart data={analytics?.categoryBreakdown ?? []} />
+            </ChartFrame>
+            <ChartFrame title="Avg Transaction & Volume" loading={analytics === undefined} empty={aovData.length === 0}>
+              <AvgTransactionChart data={aovData} />
+            </ChartFrame>
+            <ChartFrame title="Gross Margin %" loading={analytics === undefined} empty={marginData.length === 0}>
+              <MarginTrendChart data={marginData} />
+            </ChartFrame>
+            <ChartFrame title="Cash In vs Out" className="xl:col-span-2" loading={cash === undefined} empty={(cash?.buckets.length ?? 0) === 0}>
+              <CashFlowChart data={cash?.buckets ?? []} />
+            </ChartFrame>
+          </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
