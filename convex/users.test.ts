@@ -49,3 +49,25 @@ test("a disabled user is rejected by currentUser-protected endpoints", async () 
     disabled.mutation(api.sales.createSale, { items: [], cashTendered: 0 }),
   ).rejects.toThrow("Account disabled");
 });
+
+test("backfillUserEmails fills missing profile emails (idempotent)", async () => {
+  const t = convexTest(schema, modules);
+  const { as: admin } = await makeUser(t, { name: "Boss", role: "admin" });
+
+  const legacyUserId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: "legacy@shop.local" });
+    await ctx.db.insert("userProfiles", { userId: id, name: "Legacy", role: "cashier" });
+    return id;
+  });
+
+  const res = await admin.mutation(api.databaseMaintenance.backfillUserEmails, {});
+  expect(res.emailsPatched).toBe(1);
+
+  const patched = await t.run(async (ctx) =>
+    ctx.db.query("userProfiles").withIndex("by_userId", (q) => q.eq("userId", legacyUserId)).unique(),
+  );
+  expect(patched!.email).toBe("legacy@shop.local");
+
+  const res2 = await admin.mutation(api.databaseMaintenance.backfillUserEmails, {});
+  expect(res2.emailsPatched).toBe(0);
+});
