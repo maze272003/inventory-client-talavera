@@ -16,6 +16,9 @@ export default defineSchema({
     userId: v.id("users"),
     name: v.string(),
     role: roleValidator,
+    email: v.optional(v.string()),
+    disabled: v.optional(v.boolean()),
+    createdBy: v.optional(v.id("users")),
   }).index("by_userId", ["userId"]),
 
   products: defineTable({
@@ -60,7 +63,8 @@ export default defineSchema({
     isArchived: v.optional(v.boolean()),
   })
     .index("by_receiptNumber", ["receiptNumber"])
-    .index("by_archived", ["isArchived"]),
+    .index("by_archived", ["isArchived"])
+    .index("by_cashier", ["cashierId"]),
 
   saleItems: defineTable({
     saleId: v.id("sales"),
@@ -105,6 +109,7 @@ export default defineSchema({
       v.literal("sale"),
       v.literal("stock_in"),
       v.literal("adjustment"),
+      v.literal("password_reset"),
     ),
     summary: v.string(),
     before: v.optional(v.any()),
@@ -112,5 +117,9 @@ export default defineSchema({
     undoable: v.boolean(),
     reverted: v.boolean(),
     userId: v.id("users"),
-  }).index("by_reverted", ["reverted"]),
+    actorName: v.optional(v.string()),
+    actorEmail: v.optional(v.string()),
+  })
+    .index("by_reverted", ["reverted"])
+    .index("by_userId", ["userId"]),
 });

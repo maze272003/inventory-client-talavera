@@ -266,6 +266,17 @@ test("revertLatest requires admin", async () => {
   ).rejects.toThrow("Requires admin access");
 });
 
+test("audit.list and audit.latest reject a cashier with admin-access error", async () => {
+  const t = convexTest(schema, modules);
+  const cashier = await asCashier(t);
+  await expect(
+    cashier.query(api.audit.list, { paginationOpts: { numItems: 10, cursor: null } }),
+  ).rejects.toThrow("Requires admin access");
+  await expect(
+    cashier.query(api.audit.latest, {}),
+  ).rejects.toThrow("Requires admin access");
+});
+
 test("backfillArchiveFlags sets isArchived:false on legacy rows (idempotent)", async () => {
   const t = convexTest(schema, modules);
   const admin = await asAdmin(t);
@@ -301,4 +312,52 @@ test("backfillArchiveFlags sets isArchived:false on legacy rows (idempotent)", a
   const res2 = await admin.mutation(api.databaseMaintenance.backfillArchiveFlags, {});
   expect(res2.purchasesPatched).toBe(0);
   expect(res2.salesPatched).toBe(0);
+});
+
+test("recordAudit snapshots actorName and actorEmail on the entry", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t, "Snapshotter");
+  await admin.mutation(api.products.create, {
+    name: "Tin", sku: "T1", category: "C",
+    costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  const entry = await t.run(async (ctx) =>
+    (await ctx.db.query("auditLog").order("desc").take(1))[0],
+  );
+  expect(entry.actorName).toBe("Snapshotter");
+  expect(entry.actorEmail).toBe("Snapshotter@a.com");
+});
+
+test("audit.list filters by userId and enriches userEmail", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t, "Boss");
+  // A second actor making a change:
+  const otherId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: "other@a.com" });
+    await ctx.db.insert("userProfiles", { userId: id, name: "Other", role: "admin", email: "other@a.com" });
+    return id;
+  });
+  const other = t.withIdentity({ subject: otherId, tokenIdentifier: `test|${otherId}` });
+
+  await admin.mutation(api.products.create, {
+    name: "A", sku: "A1", category: "C", costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  await other.mutation(api.products.create, {
+    name: "B", sku: "B1", category: "C", costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+
+  const filtered = await admin.query(api.audit.list, {
+    paginationOpts: { numItems: 50, cursor: null },
+    userId: otherId,
+  });
+  expect(filtered.page.length).toBe(1);
+  expect(filtered.page[0].userName).toBe("Other");
+  expect(filtered.page[0].userEmail).toBe("other@a.com");
+
+  const byAction = await admin.query(api.audit.list, {
+    paginationOpts: { numItems: 50, cursor: null },
+    action: "create",
+  });
+  expect(byAction.page.every((e) => e.action === "create")).toBe(true);
+  expect(byAction.page.length).toBe(2);
 });

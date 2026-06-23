@@ -82,6 +82,33 @@ export const backfillArchiveFlagsInternal = internalMutation({
   handler: async (ctx) => doBackfillArchiveFlags(ctx),
 });
 
+async function doBackfillUserEmails(ctx: MutationCtx) {
+  let emailsPatched = 0;
+  const profiles = await ctx.db.query("userProfiles").collect();
+  for (const profile of profiles) {
+    if (profile.email !== undefined) continue;
+    const user = await ctx.db.get("users", profile.userId);
+    if (user?.email) {
+      await ctx.db.patch("userProfiles", profile._id, { email: user.email });
+      emailsPatched++;
+    }
+  }
+  return { emailsPatched };
+}
+
+export const backfillUserEmails = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireRole(ctx, "admin");
+    return doBackfillUserEmails(ctx);
+  },
+});
+
+export const backfillUserEmailsInternal = internalMutation({
+  args: {},
+  handler: async (ctx) => doBackfillUserEmails(ctx),
+});
+
 export const resetWithMasterSeed = internalMutation({
   args: { confirm: v.string() },
   handler: async (ctx, args) => {

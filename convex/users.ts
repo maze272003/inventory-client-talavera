@@ -1,6 +1,8 @@
 import { v } from "convex/values";
-import { query, internalMutation } from "./_generated/server";
-import { getCurrentUserId, getProfile } from "./lib/auth";
+import { query, mutation, internalMutation, MutationCtx, QueryCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import { getCurrentUserId, getProfile, requireRole } from "./lib/auth";
+import { recordAudit } from "./lib/audit";
 import { roleValidator } from "./schema";
 
 export const currentUser = query({
@@ -10,7 +12,7 @@ export const currentUser = query({
     if (!userId) return null;
     const profile = await getProfile(ctx, userId);
     if (!profile) return null;
-    return { _id: userId, name: profile.name, role: profile.role };
+    return { _id: userId, name: profile.name, role: profile.role, email: profile.email ?? null };
   },
 });
 
@@ -22,12 +24,210 @@ export const setProfile = internalMutation({
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
     if (existing) {
-      await ctx.db.patch("userProfiles", existing._id, {
-        name: args.name,
-        role: args.role,
-      });
+      await ctx.db.patch("userProfiles", existing._id, { name: args.name, role: args.role });
       return existing._id;
     }
     return await ctx.db.insert("userProfiles", args);
+  },
+});
+
+async function countActiveAdmins(ctx: QueryCtx | MutationCtx): Promise<number> {
+  const profiles = await ctx.db.query("userProfiles").collect();
+  return profiles.filter((p) => p.role === "admin" && p.disabled !== true).length;
+}
+
+async function getProfileByUserId(ctx: MutationCtx, userId: Id<"users">) {
+  const profile = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .unique();
+  if (!profile) throw new Error("User profile not found");
+  return profile;
+}
+
+export const setRole = mutation({
+  args: { userId: v.id("users"), role: roleValidator },
+  handler: async (ctx, args) => {
+    const { userId: callerId } = await requireRole(ctx, "admin");
+    const target = await getProfileByUserId(ctx, args.userId);
+    if (target.role === "admin" && args.role === "cashier" && (await countActiveAdmins(ctx)) <= 1) {
+      throw new Error("Cannot demote the last admin");
+    }
+    if (args.userId === callerId) throw new Error("You cannot change your own role");
+    if (target.role === args.role) return null;
+    await ctx.db.patch("userProfiles", target._id, { role: args.role });
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "update",
+      summary: `Changed role of ${target.name} from ${target.role} to ${args.role}`,
+      before: { role: target.role },
+      after: { role: args.role },
+      undoable: false,
+      userId: callerId,
+    });
+    return null;
+  },
+});
+
+export const setDisabled = mutation({
+  args: { userId: v.id("users"), disabled: v.boolean() },
+  handler: async (ctx, args) => {
+    const { userId: callerId } = await requireRole(ctx, "admin");
+    const target = await getProfileByUserId(ctx, args.userId);
+
+    if (args.disabled) {
+      if (args.userId === callerId) throw new Error("You cannot disable your own account");
+      if (target.role === "admin" && (await countActiveAdmins(ctx)) <= 1) {
+        throw new Error("Cannot disable the last admin");
+      }
+    }
+    if ((target.disabled ?? false) === args.disabled) return null;
+
+    await ctx.db.patch("userProfiles", target._id, { disabled: args.disabled });
+
+    if (args.disabled) {
+      const sessions = await ctx.db
+        .query("authSessions")
+        .withIndex("userId", (q) => q.eq("userId", args.userId))
+        .collect();
+      for (const s of sessions) await ctx.db.delete(s._id);
+    }
+
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: args.disabled ? "archive" : "restore",
+      summary: `${args.disabled ? "Disabled" : "Reactivated"} account ${target.name}`,
+      before: { disabled: target.disabled ?? false },
+      after: { disabled: args.disabled },
+      undoable: false,
+      userId: callerId,
+    });
+    return null;
+  },
+});
+
+export const rename = mutation({
+  args: { userId: v.id("users"), name: v.string() },
+  handler: async (ctx, args) => {
+    const { userId: callerId } = await requireRole(ctx, "admin");
+    const trimmed = args.name.trim();
+    if (trimmed.length === 0) throw new Error("Name is required");
+    const target = await getProfileByUserId(ctx, args.userId);
+    if (target.name === trimmed) return null;
+    await ctx.db.patch("userProfiles", target._id, { name: trimmed });
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "update",
+      summary: `Renamed ${target.name} to ${trimmed}`,
+      before: { name: target.name },
+      after: { name: trimmed },
+      undoable: false,
+      userId: callerId,
+    });
+    return null;
+  },
+});
+
+export const assertAdminCaller = query({
+  args: {},
+  handler: async (ctx) => {
+    const { userId } = await requireRole(ctx, "admin");
+    return { adminId: userId };
+  },
+});
+
+export const createUserProfile = internalMutation({
+  args: {
+    userId: v.id("users"),
+    name: v.string(),
+    email: v.string(),
+    role: roleValidator,
+    createdBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const profileId = await ctx.db.insert("userProfiles", {
+      userId: args.userId,
+      name: args.name,
+      email: args.email,
+      role: args.role,
+      disabled: false,
+      createdBy: args.createdBy,
+    });
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "create",
+      summary: `Created ${args.role} account ${args.name} (${args.email})`,
+      after: { name: args.name, email: args.email, role: args.role },
+      undoable: false,
+      userId: args.createdBy,
+    });
+    return profileId;
+  },
+});
+
+export const getEmailForUser = query({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .unique();
+    const user = await ctx.db.get("users", args.userId);
+    return { email: profile?.email ?? user?.email ?? null, name: profile?.name ?? "Unknown" };
+  },
+});
+
+export const recordPasswordReset = internalMutation({
+  args: { userId: v.id("users"), targetName: v.string() },
+  handler: async (ctx, args) => {
+    const { userId: callerId } = await requireRole(ctx, "admin");
+    await recordAudit(ctx, {
+      entityTable: "users",
+      entityId: args.userId,
+      action: "password_reset",
+      summary: `Reset password for ${args.targetName}`,
+      undoable: false,
+      userId: callerId,
+    });
+    return null;
+  },
+});
+
+export const list = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireRole(ctx, "admin");
+    const profiles = await ctx.db.query("userProfiles").collect();
+
+    const rows = await Promise.all(
+      profiles.map(async (p) => {
+        const lastAudit = await ctx.db
+          .query("auditLog")
+          .withIndex("by_userId", (q) => q.eq("userId", p.userId))
+          .order("desc")
+          .take(1);
+        const sales = await ctx.db
+          .query("sales")
+          .withIndex("by_cashier", (q) => q.eq("cashierId", p.userId))
+          .take(1000);
+        const user = await ctx.db.get("users", p.userId);
+        return {
+          userId: p.userId,
+          name: p.name,
+          email: p.email ?? user?.email ?? null,
+          role: p.role,
+          disabled: p.disabled ?? false,
+          lastActiveAt: lastAudit[0]?._creationTime ?? null,
+          totalSales: sales.length,
+        };
+      }),
+    );
+
+    return rows.sort((a, b) => a.name.localeCompare(b.name));
   },
 });

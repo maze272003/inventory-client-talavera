@@ -8,7 +8,8 @@ export type AuditAction =
   | "restore"
   | "sale"
   | "stock_in"
-  | "adjustment";
+  | "adjustment"
+  | "password_reset";
 
 export type RecordAuditArgs = {
   entityTable: string;
@@ -22,13 +23,21 @@ export type RecordAuditArgs = {
 };
 
 /**
- * Insert an auditLog row describing a data-changing mutation. Every entry is
- * created with reverted:false. Call this from each mutation that changes data.
+ * Insert an auditLog row describing a data-changing mutation. The actor's
+ * display name and email are snapshotted at write time so attribution survives
+ * later renames or account changes. Every entry is created with reverted:false.
  */
 export async function recordAudit(
   ctx: MutationCtx,
   args: RecordAuditArgs,
 ): Promise<Id<"auditLog">> {
+  const profile = await ctx.db
+    .query("userProfiles")
+    .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+    .unique();
+  const user = await ctx.db.get("users", args.userId);
+  const actorEmail = profile?.email ?? user?.email ?? undefined;
+
   return await ctx.db.insert("auditLog", {
     entityTable: args.entityTable,
     entityId: args.entityId,
@@ -39,5 +48,7 @@ export async function recordAudit(
     undoable: args.undoable,
     reverted: false,
     userId: args.userId,
+    actorName: profile?.name ?? undefined,
+    actorEmail,
   });
 }
