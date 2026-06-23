@@ -5,25 +5,47 @@ import { Doc, Id } from "./_generated/dataModel";
 import { requireRole, requireUser } from "./lib/auth";
 
 async function enrichEntry(ctx: QueryCtx, entry: Doc<"auditLog">) {
-  const profile = await ctx.db
-    .query("userProfiles")
-    .withIndex("by_userId", (q) => q.eq("userId", entry.userId))
-    .unique();
-  return { ...entry, userName: profile?.name ?? "Unknown" };
+  let userName = entry.actorName;
+  let userEmail = entry.actorEmail ?? null;
+  if (userName === undefined || userEmail === null) {
+    const profile = await ctx.db
+      .query("userProfiles")
+      .withIndex("by_userId", (q) => q.eq("userId", entry.userId))
+      .unique();
+    const user = await ctx.db.get("users", entry.userId);
+    userName = userName ?? profile?.name ?? "Unknown";
+    userEmail = userEmail ?? profile?.email ?? user?.email ?? null;
+  }
+  return { ...entry, userName: userName ?? "Unknown", userEmail };
 }
 
 export const list = query({
-  args: { paginationOpts: paginationOptsValidator },
+  args: {
+    paginationOpts: paginationOptsValidator,
+    userId: v.optional(v.id("users")),
+    action: v.optional(v.string()),
+    entityTable: v.optional(v.string()),
+    startMs: v.optional(v.number()),
+    endMs: v.optional(v.number()),
+  },
   handler: async (ctx, args) => {
     await requireUser(ctx);
-    const result = await ctx.db
-      .query("auditLog")
-      .order("desc")
-      .paginate(args.paginationOpts);
-    return {
-      ...result,
-      page: await Promise.all(result.page.map((e) => enrichEntry(ctx, e))),
-    };
+
+    const base = args.userId
+      ? ctx.db.query("auditLog").withIndex("by_userId", (q) => q.eq("userId", args.userId!)).order("desc")
+      : ctx.db.query("auditLog").order("desc");
+
+    const result = await base.paginate(args.paginationOpts);
+
+    const filtered = result.page.filter((e) => {
+      if (args.action && e.action !== args.action) return false;
+      if (args.entityTable && e.entityTable !== args.entityTable) return false;
+      if (args.startMs !== undefined && e._creationTime < args.startMs) return false;
+      if (args.endMs !== undefined && e._creationTime > args.endMs) return false;
+      return true;
+    });
+
+    return { ...result, page: await Promise.all(filtered.map((e) => enrichEntry(ctx, e))) };
   },
 });
 

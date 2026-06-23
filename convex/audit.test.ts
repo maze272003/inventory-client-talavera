@@ -316,3 +316,37 @@ test("recordAudit snapshots actorName and actorEmail on the entry", async () => 
   expect(entry.actorName).toBe("Snapshotter");
   expect(entry.actorEmail).toBe("Snapshotter@a.com");
 });
+
+test("audit.list filters by userId and enriches userEmail", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t, "Boss");
+  // A second actor making a change:
+  const otherId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: "other@a.com" });
+    await ctx.db.insert("userProfiles", { userId: id, name: "Other", role: "admin", email: "other@a.com" });
+    return id;
+  });
+  const other = t.withIdentity({ subject: otherId, tokenIdentifier: `test|${otherId}` });
+
+  await admin.mutation(api.products.create, {
+    name: "A", sku: "A1", category: "C", costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+  await other.mutation(api.products.create, {
+    name: "B", sku: "B1", category: "C", costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 1,
+  });
+
+  const filtered = await admin.query(api.audit.list, {
+    paginationOpts: { numItems: 50, cursor: null },
+    userId: otherId,
+  });
+  expect(filtered.page.length).toBe(1);
+  expect(filtered.page[0].userName).toBe("Other");
+  expect(filtered.page[0].userEmail).toBe("other@a.com");
+
+  const byAction = await admin.query(api.audit.list, {
+    paginationOpts: { numItems: 50, cursor: null },
+    action: "create",
+  });
+  expect(byAction.page.every((e) => e.action === "create")).toBe(true);
+  expect(byAction.page.length).toBe(2);
+});
