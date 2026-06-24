@@ -15,6 +15,20 @@ async function asAdmin(t: ReturnType<typeof convexTest>) {
   return t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` });
 }
 
+async function seedAdminAndProduct(t: ReturnType<typeof convexTest>) {
+  const userId = await t.run(async (ctx) => {
+    const id = await ctx.db.insert("users", { email: "seed@a.com" });
+    await ctx.db.insert("userProfiles", { userId: id, name: "Seed", role: "admin" });
+    return id;
+  });
+  const admin = t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` });
+  const pid = await admin.mutation(api.products.create, {
+    name: "Widget", sku: "w1", category: "Test",
+    costPrice: 3, sellPrice: 6, stockQty: 0, reorderThreshold: 1,
+  });
+  return { admin, pid };
+}
+
 // Brief's primary test: stockIn increases qty and logs balanceAfter
 test("stockIn increases qty and logs balanceAfter", async () => {
   const t = convexTest(schema, modules);
@@ -72,4 +86,34 @@ test("stockIn rejects quantity <= 0", async () => {
   await expect(
     admin.mutation(api.inventory.stockIn, { productId: pid, quantity: -3 }),
   ).rejects.toThrow("Quantity must be positive");
+});
+
+test("stockIn without targetBatchId creates a new batch", async () => {
+  const t = convexTest(schema, modules);
+  const { admin, pid } = await seedAdminAndProduct(t);
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 7, unitCost: 3 });
+  const { batchCount, stockQty } = await t.run(async (ctx) => {
+    const bs = await ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect();
+    const p = await ctx.db.get("products", pid);
+    return { batchCount: bs.length, stockQty: p!.stockQty };
+  });
+  expect(batchCount).toBe(1);
+  expect(stockQty).toBe(7);
+});
+
+test("stockIn with targetBatchId adds to that batch", async () => {
+  const t = convexTest(schema, modules);
+  const { admin, pid } = await seedAdminAndProduct(t);
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 4, unitCost: 3 });
+  const batchId = await t.run(async (ctx) =>
+    (await ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).first())!._id);
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 6, targetBatchId: batchId });
+  const { batchCount, remaining, stockQty } = await t.run(async (ctx) => {
+    const bs = await ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect();
+    const p = await ctx.db.get("products", pid);
+    return { batchCount: bs.length, remaining: bs[0].qtyRemaining, stockQty: p!.stockQty };
+  });
+  expect(batchCount).toBe(1);
+  expect(remaining).toBe(10);
+  expect(stockQty).toBe(10);
 });
