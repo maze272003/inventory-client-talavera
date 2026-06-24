@@ -22,6 +22,7 @@
   "dependencies": {
     "@auth/core": "^0.41.2",
     "@convex-dev/auth": "^0.0.94",
+    "@zxing/browser": "^0.2.0",
     "convex": "^1.36.1",
     "geist": "^1.7.2",
     "next": "16.2.4",
