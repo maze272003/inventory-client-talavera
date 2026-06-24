@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { CartItem } from "@/components/ProductSearch";
@@ -8,15 +9,36 @@ import { Button, Badge, Skeleton, EmptyState, Icon } from "@/components/ui";
 
 type Props = {
   search: string;
+  category?: string;
+  stockFilter?: "all" | "inStock" | "low" | "out";
   onAdd: (item: CartItem) => void;
 };
 
-export default function ProductGrid({ search, onAdd }: Props) {
+export default function ProductGrid({ search, category, stockFilter, onAdd }: Props) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.products.list,
-    { search: search.trim() || undefined, activeOnly: true },
-    { initialNumItems: 24 }
+    {
+      search: search.trim() || undefined,
+      category: category || undefined,
+      stockFilter: stockFilter ?? "all",
+      activeOnly: true,
+    },
+    { initialNumItems: 24 },
   );
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && status === "CanLoadMore") loadMore(24);
+      },
+      { rootMargin: "400px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [status, loadMore]);
 
   if (status === "LoadingFirstPage") {
     return (
@@ -61,7 +83,7 @@ export default function ProductGrid({ search, onAdd }: Props) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {results.map((product) => {
           const outOfStock = product.stockQty <= 0;
-          const lowStock = product.stockQty > 0 && product.stockQty <= 5;
+          const lowStock = product.stockQty > 0 && product.stockQty <= product.reorderThreshold;
 
           return (
             <button
@@ -96,6 +118,8 @@ export default function ProductGrid({ search, onAdd }: Props) {
                   <img
                     src={product.imageUrl}
                     alt={product.name}
+                    loading="lazy"
+                    decoding="async"
                     className="h-full w-full object-cover"
                   />
                 ) : (
@@ -110,6 +134,13 @@ export default function ProductGrid({ search, onAdd }: Props) {
                 </p>
                 {product.model && (
                   <p className="truncate text-xs text-text-muted">{product.model}</p>
+                )}
+                <p className="truncate text-[11px] text-text-muted">SKU {product.sku}</p>
+                {product.nextBatchNumber && (
+                  <p className="truncate text-[11px] font-medium text-text-muted">
+                    Batch {product.nextBatchNumber}
+                    {product.activeBatchCount > 1 ? ` ·${product.activeBatchCount}` : ""}
+                  </p>
                 )}
                 <p className="mt-auto text-sm font-bold tabular-nums text-primary">
                   {formatPeso(product.sellPrice)}
@@ -129,18 +160,15 @@ export default function ProductGrid({ search, onAdd }: Props) {
         })}
       </div>
 
-      {status === "CanLoadMore" && (
-        <div className="flex justify-center">
-          <Button variant="secondary" onClick={() => loadMore(24)}>
-            Load more
-          </Button>
+      <div ref={sentinelRef} aria-hidden className="h-1" />
+      {status === "LoadingMore" && (
+        <div className="flex justify-center py-2">
+          <Button variant="secondary" loading disabled>Loading</Button>
         </div>
       )}
-      {status === "LoadingMore" && (
+      {status === "CanLoadMore" && (
         <div className="flex justify-center">
-          <Button variant="secondary" loading disabled>
-            Loading
-          </Button>
+          <Button variant="secondary" onClick={() => loadMore(24)}>Load more</Button>
         </div>
       )}
     </div>

@@ -135,6 +135,13 @@ export default function Receipt({ saleId }: Props) {
                         <div className="text-text-muted tabular-nums">
                           {item.quantity} × {formatPeso(item.unitSellPrice)}
                         </div>
+                        {data.batchBreakdown?.[item._id]?.length ? (
+                          <p className="text-[11px] text-text-muted">
+                            {data.batchBreakdown[item._id]
+                              .map((b) => `${b.batchNumber} ×${b.quantity}`)
+                              .join(", ")}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                   </td>
