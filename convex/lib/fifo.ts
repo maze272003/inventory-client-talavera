@@ -44,7 +44,7 @@ export async function allocateFifo(
   productId: Id<"products">,
   quantity: number,
   ledgerType: "sale" | "adjustment",
-  refs: { saleId?: Id<"sales">; userId: Id<"users"> },
+  refs: { saleId?: Id<"sales">; userId: Id<"users">; reason?: string },
 ): Promise<Allocation[]> {
   if (quantity <= 0) throw new Error("Quantity must be positive");
   const product = await ctx.db.get("products", productId);
@@ -78,6 +78,7 @@ export async function allocateFifo(
       balanceAfter: runningStock,
       batchId: batch._id,
       saleId: refs.saleId,
+      reason: refs.reason,
       userId: refs.userId,
     });
     allocations.push({

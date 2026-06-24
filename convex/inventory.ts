@@ -3,7 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { requireRole } from "./lib/auth";
 import { recordAudit } from "./lib/audit";
-import { recomputeStockQty } from "./lib/fifo";
+import { allocateFifo, recomputeStockQty } from "./lib/fifo";
 import { nextBatchNumber } from "./lib/batch";
 import { Id } from "./_generated/dataModel";
 
@@ -80,15 +80,32 @@ export const adjust = mutation({
     const product = await ctx.db.get("products", args.productId);
     if (!product) throw new Error("Product not found");
     const delta = args.newQuantity - product.stockQty;
-    await ctx.db.patch("products", args.productId, { stockQty: args.newQuantity });
-    await ctx.db.insert("inventoryLedger", {
-      productId: args.productId,
-      type: "adjustment",
-      quantityDelta: delta,
-      balanceAfter: args.newQuantity,
-      reason: args.reason,
-      userId,
-    });
+
+    if (delta < 0) {
+      await allocateFifo(ctx, args.productId, -delta, "adjustment", { userId, reason: args.reason });
+    } else if (delta > 0) {
+      const batchId = await ctx.db.insert("batches", {
+        productId: args.productId,
+        batchNumber: await nextBatchNumber(ctx, Date.now()),
+        qtyReceived: delta,
+        qtyRemaining: delta,
+        unitCost: product.costPrice,
+        source: "adjustment",
+        isActive: true,
+      });
+      const balanceAfter = await recomputeStockQty(ctx, args.productId);
+      await ctx.db.insert("inventoryLedger", {
+        productId: args.productId,
+        type: "adjustment",
+        quantityDelta: delta,
+        balanceAfter,
+        reason: args.reason,
+        batchId,
+        userId,
+      });
+    }
+    // delta === 0 → no-op stock change.
+
     await recordAudit(ctx, {
       entityTable: "products",
       entityId: args.productId,

@@ -101,6 +101,36 @@ test("stockIn without targetBatchId creates a new batch", async () => {
   expect(stockQty).toBe(7);
 });
 
+test("adjust down drains oldest batch first", async () => {
+  const t = convexTest(schema, modules);
+  const { admin, pid } = await seedAdminAndProduct(t);
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 3, unitCost: 2 });
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 5, unitCost: 2 }); // total 8
+  await admin.mutation(api.inventory.adjust, { productId: pid, newQuantity: 4, reason: "count" });
+  const { remaining, stockQty } = await t.run(async (ctx) => {
+    const bs = (await ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect())
+      .sort((a, b) => a._creationTime - b._creationTime);
+    const p = await ctx.db.get("products", pid);
+    return { remaining: bs.map((b) => b.qtyRemaining), stockQty: p!.stockQty };
+  });
+  expect(remaining).toEqual([0, 4]); // drained the first batch, then 1 from second
+  expect(stockQty).toBe(4);
+});
+
+test("adjust up creates an adjustment batch", async () => {
+  const t = convexTest(schema, modules);
+  const { admin, pid } = await seedAdminAndProduct(t);
+  await admin.mutation(api.inventory.stockIn, { productId: pid, quantity: 2, unitCost: 2 });
+  await admin.mutation(api.inventory.adjust, { productId: pid, newQuantity: 9, reason: "found" });
+  const { sources, stockQty } = await t.run(async (ctx) => {
+    const bs = await ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect();
+    const p = await ctx.db.get("products", pid);
+    return { sources: bs.map((b) => b.source).sort(), stockQty: p!.stockQty };
+  });
+  expect(sources).toEqual(["adjustment", "stock_in"]);
+  expect(stockQty).toBe(9);
+});
+
 test("stockIn with targetBatchId adds to that batch", async () => {
   const t = convexTest(schema, modules);
   const { admin, pid } = await seedAdminAndProduct(t);
