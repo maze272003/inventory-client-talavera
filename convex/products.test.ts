@@ -152,6 +152,55 @@ test("update does not change batchNumber", async () => {
   expect(after?.batchNumber).toEqual(before?.batchNumber);
 });
 
+// Task 4: opening batch row is created when stockQty > 0
+test("creating a product with opening stock creates one opening batch", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  const pid = await admin.mutation(api.products.create, {
+    name: "Bolt", sku: "B1", category: "Hardware",
+    costPrice: 2, sellPrice: 5, stockQty: 10, reorderThreshold: 1,
+  });
+  const batches = await t.run(async (ctx) =>
+    ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect(),
+  );
+  expect(batches).toHaveLength(1);
+  expect(batches[0]).toMatchObject({
+    qtyReceived: 10, qtyRemaining: 10, unitCost: 2, source: "opening", isActive: true,
+  });
+});
+
+// Task 4: no opening batch when stockQty is 0
+test("creating a product with stockQty 0 creates no batch", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  const pid = await admin.mutation(api.products.create, {
+    name: "Empty", sku: "E99", category: "Hardware",
+    costPrice: 5, sellPrice: 10, stockQty: 0, reorderThreshold: 1,
+  });
+  const batches = await t.run(async (ctx) =>
+    ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect(),
+  );
+  expect(batches).toHaveLength(0);
+});
+
+// Task 4: opening ledger row has batchId linking to the opening batch
+test("opening ledger row references the opening batch via batchId", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  const pid = await admin.mutation(api.products.create, {
+    name: "Nut", sku: "N1", category: "Hardware",
+    costPrice: 3, sellPrice: 7, stockQty: 5, reorderThreshold: 1,
+  });
+  const [batch] = await t.run(async (ctx) =>
+    ctx.db.query("batches").withIndex("by_product", (q) => q.eq("productId", pid)).collect(),
+  );
+  const ledger = await t.run(async (ctx) =>
+    ctx.db.query("inventoryLedger").withIndex("by_product", (q) => q.eq("productId", pid)).collect(),
+  );
+  expect(ledger).toHaveLength(1);
+  expect(ledger[0].batchId).toEqual(batch._id);
+});
+
 // Batch number (4): backfill numbers un-numbered rows, leaves numbered rows alone
 test("backfillBatchNumbersInternal numbers only un-numbered products", async () => {
   const t = convexTest(schema, modules);

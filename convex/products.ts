@@ -28,6 +28,15 @@ export const create = mutation({
     const batchNumber = await nextBatchNumber(ctx, Date.now());
     const id = await ctx.db.insert("products", { ...args, isActive: true, batchNumber });
     if (args.stockQty > 0) {
+      const batchId = await ctx.db.insert("batches", {
+        productId: id,
+        batchNumber,
+        qtyReceived: args.stockQty,
+        qtyRemaining: args.stockQty,
+        unitCost: args.costPrice,
+        source: "opening",
+        isActive: true,
+      });
       await ctx.db.insert("inventoryLedger", {
         productId: id,
         type: "stock_in",
@@ -35,6 +44,7 @@ export const create = mutation({
         balanceAfter: args.stockQty,
         unitCost: args.costPrice,
         reason: "Opening balance",
+        batchId,
         userId,
       });
     }

@@ -28,9 +28,13 @@ async function seedProduct(
     costPrice: number; sellPrice: number; stockQty: number; reorderThreshold: number;
   },
 ): Promise<Id<"products">> {
-  const pid = await admin.mutation(api.products.create, args);
+  // Create product with stockQty:0 so products.create does NOT generate an opening batch.
+  // Then manually patch the stockQty and insert the intended batch(es) so allocateFifo
+  // sees exactly one batch matching the original stockQty.
+  const pid = await admin.mutation(api.products.create, { ...args, stockQty: 0 });
   if (args.stockQty > 0) {
     await t.run(async (ctx) => {
+      await ctx.db.patch("products", pid, { stockQty: args.stockQty });
       await ctx.db.insert("batches", {
         productId: pid,
         batchNumber: `SEED-${args.sku}`,
