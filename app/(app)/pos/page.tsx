@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import ProductSearch, { CartItem } from "@/components/ProductSearch";
 import ProductGrid from "@/components/ProductGrid";
+import CategoryChips from "@/components/pos/CategoryChips";
+import PosFilters from "@/components/pos/PosFilters";
 import Cart from "@/components/Cart";
 import Receipt from "@/components/Receipt";
 import { formatPeso } from "@/lib/format";
@@ -30,6 +32,8 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gridSearch, setGridSearch] = useState("");
+  const [category, setCategory] = useState<string | undefined>(undefined);
+  const [stockFilter, setStockFilter] = useState<"all" | "inStock" | "low" | "out">("all");
   const [helpOpen, setHelpOpen] = useState(false);
 
   const createSale = useMutation(api.sales.createSale);
@@ -279,16 +283,27 @@ export default function PosPage() {
           {/* Browse grid */}
           <Card>
             <CardBody className="space-y-3">
-              <Field label="Browse products">
-                <Input
-                  id="grid-search"
-                  type="text"
-                  value={gridSearch}
-                  onChange={(e) => setGridSearch(e.target.value)}
-                  placeholder="Filter by name…"
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Field label="Browse products" className="flex-1">
+                  <Input
+                    id="grid-search"
+                    type="text"
+                    value={gridSearch}
+                    onChange={(e) => setGridSearch(e.target.value)}
+                    placeholder="Filter by name…"
+                  />
+                </Field>
+                <PosFilters value={stockFilter} onChange={setStockFilter} />
+              </div>
+              <CategoryChips value={category} onChange={setCategory} />
+              <div className="max-h-[60vh] overflow-y-auto sm:max-h-[70vh]">
+                <ProductGrid
+                  search={gridSearch}
+                  category={category}
+                  stockFilter={stockFilter}
+                  onAdd={handleAddToCart}
                 />
-              </Field>
-              <ProductGrid search={gridSearch} onAdd={handleAddToCart} />
+              </div>
             </CardBody>
           </Card>
 
