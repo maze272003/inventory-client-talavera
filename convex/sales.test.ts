@@ -204,7 +204,7 @@ test("createSale writes sale-type ledger row with negative quantityDelta and cor
 // Task 3: FIFO allocation — sale spanning two batches records breakdown
 test("sale spanning two batches records FIFO breakdown", async () => {
   const t = convexTest(schema, modules);
-  const { pid } = await t.run(async (ctx) => {
+  const { pid, userId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { email: "c@d.e" });
     await ctx.db.insert("userProfiles", { userId, name: "Cashier", role: "cashier" });
     const pid = await ctx.db.insert("products", {
@@ -219,16 +219,9 @@ test("sale spanning two batches records FIFO breakdown", async () => {
       productId: pid, batchNumber: "BN-2", qtyReceived: 5, qtyRemaining: 5,
       unitCost: 6, source: "stock_in", isActive: true,
     });
-    return { pid };
+    return { pid, userId };
   });
 
-  // Seed an authenticated user and use withIdentity pattern
-  const userId = await t.run(async (ctx) => {
-    return await ctx.db.insert("users", { email: "cashier2@test.com" });
-  });
-  await t.run(async (ctx) => {
-    await ctx.db.insert("userProfiles", { userId, name: "Cashier2", role: "cashier" });
-  });
   const asCashier = t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` });
 
   const result = await asCashier.mutation(api.sales.createSale, {
@@ -252,7 +245,7 @@ test("sale spanning two batches records FIFO breakdown", async () => {
 // Task 3: FIFO allocation — sale rejected when total stock across batches is insufficient
 test("sale rejected when total stock across batches is insufficient", async () => {
   const t = convexTest(schema, modules);
-  const { pid } = await t.run(async (ctx) => {
+  const { pid, userId } = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", { email: "x@y.z" });
     await ctx.db.insert("userProfiles", { userId, name: "Cashier", role: "cashier" });
     const pid = await ctx.db.insert("products", {
@@ -263,16 +256,10 @@ test("sale rejected when total stock across batches is insufficient", async () =
       productId: pid, batchNumber: "BN-1", qtyReceived: 2, qtyRemaining: 2,
       unitCost: 5, source: "stock_in", isActive: true,
     });
-    return { pid };
+    return { pid, userId };
   });
 
-  const userId2 = await t.run(async (ctx) => {
-    return await ctx.db.insert("users", { email: "cashier3@test.com" });
-  });
-  await t.run(async (ctx) => {
-    await ctx.db.insert("userProfiles", { userId: userId2, name: "Cashier3", role: "cashier" });
-  });
-  const asCashier = t.withIdentity({ subject: userId2, tokenIdentifier: `test|${userId2}` });
+  const asCashier = t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` });
 
   await expect(
     asCashier.mutation(api.sales.createSale, {
