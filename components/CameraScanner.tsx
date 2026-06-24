@@ -78,10 +78,10 @@ export default function CameraScanner({ open, onClose, onDetected }: Props) {
           <div
             ref={scanLineRef}
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-green-400/80"
-            style={{ animation: "scan-sweep 1.8s linear infinite" }}
+            className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-green-400/80 cs-scan-line"
           />
           <style>{`
+            .cs-scan-line { animation: scan-sweep 1.8s linear infinite; }
             @keyframes scan-sweep {
               0%   { transform: translateY(0); }
               100% { transform: translateY(180px); }

@@ -81,8 +81,11 @@ export const adjust = mutation({
     if (!product) throw new Error("Product not found");
     const delta = args.newQuantity - product.stockQty;
 
+    let actualStockQty: number = product.stockQty;
     if (delta < 0) {
       await allocateFifo(ctx, args.productId, -delta, "adjustment", { userId, reason: args.reason });
+      // allocateFifo patches stockQty; recompute to get the authoritative post-mutation value.
+      actualStockQty = await recomputeStockQty(ctx, args.productId);
     } else if (delta > 0) {
       const batchId = await ctx.db.insert("batches", {
         productId: args.productId,
@@ -93,18 +96,18 @@ export const adjust = mutation({
         source: "adjustment",
         isActive: true,
       });
-      const balanceAfter = await recomputeStockQty(ctx, args.productId);
+      actualStockQty = await recomputeStockQty(ctx, args.productId);
       await ctx.db.insert("inventoryLedger", {
         productId: args.productId,
         type: "adjustment",
         quantityDelta: delta,
-        balanceAfter,
+        balanceAfter: actualStockQty,
         reason: args.reason,
         batchId,
         userId,
       });
     }
-    // delta === 0 → no-op stock change.
+    // delta === 0 → no-op stock change; actualStockQty stays as product.stockQty.
 
     await recordAudit(ctx, {
       entityTable: "products",
@@ -112,7 +115,7 @@ export const adjust = mutation({
       action: "adjustment",
       summary: `Adjusted ${product.name} to ${args.newQuantity} (${args.reason})`,
       before: { stockQty: product.stockQty },
-      after: { stockQty: args.newQuantity },
+      after: { stockQty: actualStockQty },
       undoable: false,
       userId,
     });

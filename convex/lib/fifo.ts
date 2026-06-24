@@ -19,6 +19,9 @@ export async function activeBatchesOldestFirst(
       q.eq("productId", productId).eq("isActive", true),
     )
     .order("asc")
+    // Safety cap: a single product is not expected to exceed 500 concurrently-active
+    // batches. If that assumption ever changes (e.g. very high-frequency small receipts),
+    // this must be replaced with a paginated loop to avoid silently truncating FIFO order.
     .take(500);
 }
 
