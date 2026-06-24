@@ -10,6 +10,7 @@
 
 import type * as audit from "../audit.js";
 import type * as auth from "../auth.js";
+import type * as batches from "../batches.js";
 import type * as databaseMaintenance from "../databaseMaintenance.js";
 import type * as files from "../files.js";
 import type * as http from "../http.js";
@@ -18,6 +19,7 @@ import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_batch from "../lib/batch.js";
 import type * as lib_buckets from "../lib/buckets.js";
+import type * as lib_fifo from "../lib/fifo.js";
 import type * as products from "../products.js";
 import type * as purchases from "../purchases.js";
 import type * as reports from "../reports.js";
@@ -35,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   audit: typeof audit;
   auth: typeof auth;
+  batches: typeof batches;
   databaseMaintenance: typeof databaseMaintenance;
   files: typeof files;
   http: typeof http;
@@ -43,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/batch": typeof lib_batch;
   "lib/buckets": typeof lib_buckets;
+  "lib/fifo": typeof lib_fifo;
   products: typeof products;
   purchases: typeof purchases;
   reports: typeof reports;
