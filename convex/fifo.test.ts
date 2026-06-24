@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -13,7 +12,7 @@ async function seedProductWithBatches(
 ) {
   // Insert admin identity + product directly through a test mutation surface.
   const productId = await t.run(async (ctx) => {
-    const userId = await ctx.db.insert("users", { email: "a@b.c" } as any);
+    const userId = await ctx.db.insert("users", { email: "a@b.c" });
     await ctx.db.insert("userProfiles", {
       userId, name: "Admin", role: "admin",
     });
@@ -56,11 +55,12 @@ test("FIFO drains the oldest batch first", async () => {
       .query("batches").withIndex("by_product", (q) => q.eq("productId", pid))
       .collect();
     const product = await ctx.db.get("products", pid);
+    const sorted = [...batches].sort(
+      (a, b) => a._creationTime - b._creationTime,
+    );
     return {
-      remaining: batches.sort((a, b) => a._creationTime - b._creationTime)
-        .map((b) => b.qtyRemaining),
-      active: batches.sort((a, b) => a._creationTime - b._creationTime)
-        .map((b) => b.isActive),
+      remaining: sorted.map((b) => b.qtyRemaining),
+      active: sorted.map((b) => b.isActive),
       stockQty: product!.stockQty,
     };
   });
