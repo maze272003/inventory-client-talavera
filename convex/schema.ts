@@ -9,6 +9,14 @@ export const ledgerTypeValidator = v.union(
   v.literal("adjustment"),
 );
 
+export const batchSourceValidator = v.union(
+  v.literal("opening"),
+  v.literal("stock_in"),
+  v.literal("purchase"),
+  v.literal("adjustment"),
+  v.literal("migration"),
+);
+
 export default defineSchema({
   ...authTables,
   // Per-user app profile (role). Keyed to the auth users table.
@@ -49,11 +57,13 @@ export default defineSchema({
     reason: v.optional(v.string()),
     saleId: v.optional(v.id("sales")),
     purchaseId: v.optional(v.id("purchases")),
+    batchId: v.optional(v.id("batches")),
     userId: v.id("users"),
   })
     .index("by_product", ["productId"])
     .index("by_type", ["type"])
-    .index("by_purchase", ["purchaseId"]),
+    .index("by_purchase", ["purchaseId"])
+    .index("by_batch", ["batchId"]),
 
   sales: defineTable({
     receiptNumber: v.number(),
@@ -99,6 +109,31 @@ export default defineSchema({
   })
     .index("by_supplier", ["supplierName"])
     .index("by_archived", ["isArchived"]),
+
+  batches: defineTable({
+    productId: v.id("products"),
+    batchNumber: v.string(),
+    qtyReceived: v.number(),
+    qtyRemaining: v.number(),
+    unitCost: v.number(),
+    source: batchSourceValidator,
+    purchaseId: v.optional(v.id("purchases")),
+    isActive: v.boolean(),
+  })
+    .index("by_product", ["productId"])
+    .index("by_product_active", ["productId", "isActive"])
+    .index("by_batchNumber", ["batchNumber"]),
+
+  saleItemBatches: defineTable({
+    saleItemId: v.id("saleItems"),
+    saleId: v.id("sales"),
+    batchId: v.id("batches"),
+    batchNumberSnapshot: v.string(),
+    quantity: v.number(),
+    unitCost: v.number(),
+  })
+    .index("by_saleItem", ["saleItemId"])
+    .index("by_sale", ["saleId"]),
 
   auditLog: defineTable({
     entityTable: v.string(),
