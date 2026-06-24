@@ -5,6 +5,7 @@ import { Doc } from "./_generated/dataModel";
 import { requireRole } from "./lib/auth";
 import { recordAudit } from "./lib/audit";
 import { nextBatchNumber } from "./lib/batch";
+import { recomputeStockQty } from "./lib/fifo";
 
 const lineValidator = v.object({
   existingProductId: v.optional(v.id("products")),
@@ -79,8 +80,17 @@ export const createPurchase = mutation({
 
       const product = await ctx.db.get("products", productId!);
       if (!product) throw new Error("Product not found");
-      const balanceAfter = product.stockQty + line.quantity;
-      await ctx.db.patch("products", product._id, { stockQty: balanceAfter });
+      const batchId = await ctx.db.insert("batches", {
+        productId: product._id,
+        batchNumber: await nextBatchNumber(ctx, Date.now()),
+        qtyReceived: line.quantity,
+        qtyRemaining: line.quantity,
+        unitCost: line.unitCost,
+        source: "purchase",
+        purchaseId,
+        isActive: true,
+      });
+      const balanceAfter = await recomputeStockQty(ctx, product._id);
       await ctx.db.insert("inventoryLedger", {
         productId: product._id,
         type: "stock_in",
@@ -88,6 +98,7 @@ export const createPurchase = mutation({
         balanceAfter,
         unitCost: line.unitCost,
         purchaseId,
+        batchId,
         userId,
       });
       total += line.unitCost * line.quantity;

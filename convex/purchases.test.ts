@@ -132,6 +132,31 @@ test("createPurchase atomic rollback: invalid 2nd line leaves 1st product unchan
   expect(product?.stockQty).toEqual(10);
 });
 
+test("each purchase line creates a purchase-sourced batch", async () => {
+  const t = convexTest(schema, modules);
+  const { t: admin } = await asAdmin(t);
+  const fileId = await fakeFileId(t);
+
+  const existingPid = await admin.mutation(api.products.create, {
+    name: "Existing", sku: "E1", category: "C", costPrice: 1, sellPrice: 2,
+    stockQty: 0, reorderThreshold: 0,
+  });
+
+  await admin.mutation(api.purchases.createPurchase, {
+    fileId, supplierName: "Acme", purchaseDate: 1700000000000,
+    lines: [
+      { existingProductId: existingPid, quantity: 5, unitCost: 3 },
+      { newProduct: { name: "Fresh", category: "C", sellPrice: 9 }, quantity: 2, unitCost: 4 },
+    ],
+  });
+
+  const counts = await t.run(async (ctx) => {
+    const all = await ctx.db.query("batches").collect();
+    return all.filter((b) => b.source === "purchase").length;
+  });
+  expect(counts).toBe(2);
+});
+
 test("createPurchase assigns an auto-generated batch number to imported new products", async () => {
   const t = convexTest(schema, modules);
   const { t: admin } = await asAdmin(t);
