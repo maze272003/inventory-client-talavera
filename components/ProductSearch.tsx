@@ -210,9 +210,10 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     setInputValue(e.target.value);
-    if (skuNotFound || searchTerm !== null) {
+    if (skuNotFound || searchTerm !== null || batchLookupTerm !== null) {
       setSkuNotFound(false);
       setSearchTerm(null);
+      setBatchLookupTerm(null);
     }
   }
 
@@ -268,7 +269,7 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
       {/* Batch-number lookup — mounted only when an SKU miss reveals a BN- term */}
       {batchLookupTerm !== null && (
         <BatchLookup
-          key={batchLookupTerm}
+          key={`batch-${lookupKey}`}
           batchNumber={batchLookupTerm}
           onFound={handleBatchFound}
           onNotFound={handleBatchNotFound}
