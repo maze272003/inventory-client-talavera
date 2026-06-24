@@ -271,3 +271,39 @@ test("sale rejected when total stock across batches is insufficient", async () =
     }),
   ).rejects.toThrow(/Insufficient stock/);
 });
+
+// Task 10: getSale returns per-item batch breakdown
+test("getSale returns per-item batch breakdown", async () => {
+  const t = convexTest(schema, modules);
+  const { pid, userId } = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", { email: "bd@test.com" });
+    await ctx.db.insert("userProfiles", { userId, name: "Cashier", role: "cashier" });
+    const pid = await ctx.db.insert("products", {
+      name: "Widget", sku: "BD1", category: "C", costPrice: 5, sellPrice: 10,
+      stockQty: 8, reorderThreshold: 0, isActive: true,
+    });
+    await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-1", qtyReceived: 3, qtyRemaining: 3,
+      unitCost: 4, source: "stock_in", isActive: true,
+    });
+    await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-2", qtyReceived: 5, qtyRemaining: 5,
+      unitCost: 6, source: "stock_in", isActive: true,
+    });
+    return { pid, userId };
+  });
+
+  const asCashier = t.withIdentity({ subject: userId, tokenIdentifier: `test|${userId}` });
+
+  const result = await asCashier.mutation(api.sales.createSale, {
+    items: [{ productId: pid, quantity: 4 }],
+    cashTendered: 100,
+  });
+
+  const sale = await asCashier.query(api.sales.getSale, { saleId: result.saleId });
+  expect(sale).not.toBeNull();
+  const itemId = sale!.items[0]._id;
+  expect(
+    sale!.batchBreakdown[itemId].map((x: { batchNumber: string; quantity: number }) => x.batchNumber).sort()
+  ).toEqual(["BN-1", "BN-2"]);
+});

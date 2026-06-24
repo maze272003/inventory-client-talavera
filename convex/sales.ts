@@ -174,7 +174,18 @@ export const getSale = query({
       name: cashierProfile?.name ?? "Unknown",
       email: cashierProfile?.email ?? cashierUser?.email ?? null,
     };
-    return { sale, items: itemsWithImages, cashier };
+    const breakdownRows = await ctx.db
+      .query("saleItemBatches")
+      .withIndex("by_sale", (q) => q.eq("saleId", args.saleId))
+      .take(1000);
+    const batchBreakdown: Record<string, { batchNumber: string; quantity: number }[]> = {};
+    for (const r of breakdownRows) {
+      (batchBreakdown[r.saleItemId] ??= []).push({
+        batchNumber: r.batchNumberSnapshot,
+        quantity: r.quantity,
+      });
+    }
+    return { sale, items: itemsWithImages, cashier, batchBreakdown };
   },
 });
 
