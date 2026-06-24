@@ -1,8 +1,40 @@
 "use client";
 
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso } from "@/lib/format";
 import type { CartItem } from "./ProductSearch";
 import { EmptyState, Icon, Badge } from "@/components/ui";
+
+function BatchPreview({
+  productId,
+  quantity,
+}: {
+  productId: Id<"products">;
+  quantity: number;
+}) {
+  const batches = useQuery(api.batches.listForProduct, { productId });
+  if (!batches || batches.length === 0) return null;
+  const parts: string[] = [];
+  let need = quantity;
+  for (const b of batches) {
+    if (need <= 0) break;
+    const take = Math.min(b.qtyRemaining, need);
+    parts.push(`${b.batchNumber} ×${take}`);
+    need -= take;
+  }
+  if (parts.length === 0) return null;
+  return (
+    <p
+      className="truncate text-[11px] text-text-muted"
+      title={parts.join(", ")}
+    >
+      FIFO: {parts.join(", ")}
+      {need > 0 ? " (short!)" : ""}
+    </p>
+  );
+}
 
 type Props = {
   items: CartItem[];
@@ -68,6 +100,10 @@ export default function Cart({ items, onUpdate }: Props) {
                       <p className="text-xs text-text-muted">
                         {item.sku} &middot; {formatPeso(item.sellPrice)} each
                       </p>
+                      <BatchPreview
+                        productId={item.productId}
+                        quantity={item.quantity}
+                      />
                       {overStock && (
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-warning-fg">
                           <Icon name="alert-triangle" size={12} />
