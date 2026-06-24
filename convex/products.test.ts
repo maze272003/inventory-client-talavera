@@ -201,6 +201,36 @@ test("opening ledger row references the opening batch via batchId", async () => 
   expect(ledger[0].batchId).toEqual(batch._id);
 });
 
+// Task 9: list attaches batch summary and supports stock filter
+test("list attaches batch summary and supports stock filter", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  await admin.mutation(api.products.create, { name: "A", sku: "A", category: "X", costPrice: 1, sellPrice: 2, stockQty: 10, reorderThreshold: 2 });
+  await admin.mutation(api.products.create, { name: "B", sku: "B", category: "Y", costPrice: 1, sellPrice: 2, stockQty: 0, reorderThreshold: 2 });
+
+  const page = await admin.query(api.products.list, {
+    paginationOpts: { numItems: 50, cursor: null }, activeOnly: true, stockFilter: "inStock",
+  });
+  type PageItem = { name: string; activeBatchCount: number; nextBatchNumber: string | null };
+  const names = (page.page as PageItem[]).map((p) => p.name);
+  expect(names).toContain("A");
+  expect(names).not.toContain("B");
+  const itemA = (page.page as PageItem[]).find((p) => p.name === "A")!;
+  expect(itemA.activeBatchCount).toBe(1);
+  expect(typeof itemA.nextBatchNumber).toBe("string");
+});
+
+// Task 9: categories returns distinct active categories
+test("categories returns distinct active categories", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await asAdmin(t);
+  await admin.mutation(api.products.create, { name: "A", sku: "A", category: "X", costPrice: 1, sellPrice: 2, stockQty: 1, reorderThreshold: 0 });
+  await admin.mutation(api.products.create, { name: "B", sku: "B", category: "X", costPrice: 1, sellPrice: 2, stockQty: 1, reorderThreshold: 0 });
+  await admin.mutation(api.products.create, { name: "C", sku: "C", category: "Y", costPrice: 1, sellPrice: 2, stockQty: 1, reorderThreshold: 0 });
+  const cats = await admin.query(api.products.categories, {});
+  expect([...cats].sort()).toEqual(["X", "Y"]);
+});
+
 // Batch number (4): backfill numbers un-numbered rows, leaves numbered rows alone
 test("backfillBatchNumbersInternal numbers only un-numbered products", async () => {
   const t = convexTest(schema, modules);

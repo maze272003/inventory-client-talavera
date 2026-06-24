@@ -11,6 +11,30 @@ async function withImageUrl(ctx: QueryCtx, product: Doc<"products">) {
   return { ...product, imageUrl };
 }
 
+async function withBatchSummary(ctx: QueryCtx, product: Doc<"products">) {
+  const active = await ctx.db
+    .query("batches")
+    .withIndex("by_product_active", (q) => q.eq("productId", product._id).eq("isActive", true))
+    .order("asc")
+    .take(500);
+  const imageUrl = product.imageId ? await ctx.storage.getUrl(product.imageId) : null;
+  return {
+    ...product,
+    imageUrl,
+    activeBatchCount: active.length,
+    nextBatchNumber: active[0]?.batchNumber ?? null,
+  };
+}
+
+function passesStockFilter(p: Doc<"products">, f: string | undefined): boolean {
+  switch (f) {
+    case "inStock": return p.stockQty > 0;
+    case "out": return p.stockQty <= 0;
+    case "low": return p.stockQty > 0 && p.stockQty <= p.reorderThreshold;
+    default: return true; // "all" / undefined
+  }
+}
+
 export const create = mutation({
   args: {
     name: v.string(),
@@ -131,6 +155,9 @@ export const list = query({
     search: v.optional(v.string()),
     category: v.optional(v.string()),
     activeOnly: v.optional(v.boolean()),
+    stockFilter: v.optional(
+      v.union(v.literal("all"), v.literal("inStock"), v.literal("low"), v.literal("out")),
+    ),
   },
   handler: async (ctx, args) => {
     await requireUser(ctx);
@@ -165,7 +192,8 @@ export const list = query({
     } else {
       result = await ctx.db.query("products").order("desc").paginate(args.paginationOpts);
     }
-    return { ...result, page: await Promise.all(result.page.map((p) => withImageUrl(ctx, p))) };
+    const enriched = await Promise.all(result.page.map((p) => withBatchSummary(ctx, p)));
+    return { ...result, page: enriched.filter((p) => passesStockFilter(p, args.stockFilter)) };
   },
 });
 
@@ -212,5 +240,17 @@ export const lowStock = query({
       .withIndex("by_active", (q) => q.eq("isActive", true))
       .take(500);
     return active.filter((p) => p.stockQty <= p.reorderThreshold);
+  },
+});
+
+export const categories = query({
+  args: {},
+  handler: async (ctx) => {
+    await requireUser(ctx);
+    const active = await ctx.db
+      .query("products")
+      .withIndex("by_active", (q) => q.eq("isActive", true))
+      .take(1000);
+    return [...new Set(active.map((p) => p.category))].sort();
   },
 });
