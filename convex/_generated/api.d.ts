@@ -20,6 +20,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_batch from "../lib/batch.js";
 import type * as lib_buckets from "../lib/buckets.js";
 import type * as lib_fifo from "../lib/fifo.js";
+import type * as migrations from "../migrations.js";
 import type * as products from "../products.js";
 import type * as purchases from "../purchases.js";
 import type * as reports from "../reports.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   "lib/batch": typeof lib_batch;
   "lib/buckets": typeof lib_buckets;
   "lib/fifo": typeof lib_fifo;
+  migrations: typeof migrations;
   products: typeof products;
   purchases: typeof purchases;
   reports: typeof reports;
