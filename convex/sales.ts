@@ -4,6 +4,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator, PaginationResult } from "convex/server";
 import { requireUser, requireRole } from "./lib/auth";
 import { recordAudit } from "./lib/audit";
+import { allocateFifo, weightedAvgCost } from "./lib/fifo";
 
 async function nextReceiptNumber(ctx: MutationCtx): Promise<number> {
   const counter = await ctx.db
@@ -28,16 +29,16 @@ export const createSale = mutation({
     const { userId } = await requireUser(ctx);
     if (args.items.length === 0) throw new Error("Cart is empty");
 
-    // Aggregate duplicate productIds so each product is validated and written once
     const merged = new Map<Id<"products">, number>();
     for (const item of args.items) {
       if (item.quantity <= 0) throw new Error("Quantity must be positive");
       merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.quantity);
     }
 
+    // Validate availability and price up front (FIFO walk happens after the
+    // sale header exists so ledger rows can carry saleId).
     const lines: Array<{ product: Doc<"products">; quantity: number; lineTotal: number }> = [];
     let total = 0;
-
     for (const [productId, quantity] of merged.entries()) {
       const product = await ctx.db.get("products", productId);
       if (!product || !product.isActive) throw new Error("Product unavailable");
@@ -64,26 +65,32 @@ export const createSale = mutation({
     });
 
     for (const l of lines) {
-      const balanceAfter = l.product.stockQty - l.quantity;
-      await ctx.db.patch("products", l.product._id, { stockQty: balanceAfter });
-      await ctx.db.insert("saleItems", {
+      // FIFO allocation: patches batches, writes ledger rows, updates stockQty.
+      const allocations = await allocateFifo(ctx, l.product._id, l.quantity, "sale", {
+        saleId,
+        userId,
+      });
+      const unitCostPrice = weightedAvgCost(allocations);
+      const saleItemId = await ctx.db.insert("saleItems", {
         saleId,
         productId: l.product._id,
         nameSnapshot: l.product.name,
         skuSnapshot: l.product.sku,
         unitSellPrice: l.product.sellPrice,
-        unitCostPrice: l.product.costPrice,
+        unitCostPrice,
         quantity: l.quantity,
         lineTotal: l.lineTotal,
       });
-      await ctx.db.insert("inventoryLedger", {
-        productId: l.product._id,
-        type: "sale",
-        quantityDelta: -l.quantity,
-        balanceAfter,
-        saleId,
-        userId,
-      });
+      for (const a of allocations) {
+        await ctx.db.insert("saleItemBatches", {
+          saleItemId,
+          saleId,
+          batchId: a.batchId,
+          batchNumberSnapshot: a.batchNumber,
+          quantity: a.quantity,
+          unitCost: a.unitCost,
+        });
+      }
     }
 
     await recordAudit(ctx, {
