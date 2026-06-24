@@ -14,16 +14,21 @@
 
 :root {
   /* Color — neutral slate base, indigo primary */
-  --color-bg: #f8fafc;          /* slate-50  */
+  --color-bg: #f1f5f9;          /* slate-100 — app canvas (subtle depth vs surface) */
   --color-surface: #ffffff;     /* cards / panels */
   --color-surface-2: #f1f5f9;   /* slate-100 — subtle raised / hover */
+  --color-surface-3: #e2e8f0;   /* slate-200 — pressed / inset */
   --color-border: #e2e8f0;      /* slate-200 */
+  --color-border-strong: #cbd5e1; /* slate-300 — emphasis dividers */
   --color-text: #0f172a;        /* slate-900 */
   --color-text-muted: #64748b;  /* slate-500 */
+  --color-text-subtle: #94a3b8; /* slate-400 — tertiary */
 
   --color-primary: #4f46e5;       /* indigo-600 */
   --color-primary-hover: #4338ca; /* indigo-700 */
   --color-primary-fg: #ffffff;
+  --color-primary-soft: #eef2ff;  /* indigo-50 — tinted backgrounds */
+  --color-primary-soft-fg: #4338ca; /* indigo-700 text on tint */
 
   --color-success: #059669;       /* emerald-600 */
   --color-success-fg: #ffffff;
@@ -37,8 +42,16 @@
   --color-danger-fg: #ffffff;
   --color-danger-bg: #ffe4e6;     /* rose-100 */
 
+  --color-info: #0284c7;          /* sky-600 */
+  --color-info-fg: #ffffff;
+  --color-info-bg: #e0f2fe;       /* sky-100 */
+
   /* Focus ring color */
   --color-ring: #6366f1;          /* indigo-500 */
+
+  /* Brand gradient — used for hero accents, brand marks, primary CTAs */
+  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
 
   /* Radius */
   --radius-sm: 0.25rem;   /* 4px  */
@@ -46,15 +59,26 @@
   --radius-lg: 0.75rem;   /* 12px */
   --radius-xl: 1rem;      /* 16px */
 
-  /* Shadow — subtle, border-first elevation */
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05);
-  --shadow-md: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  /* Shadow — layered elevation system */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.04);
+  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.10), 0 8px 10px -6px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(15 23 42 / 0.18), 0 4px 12px -4px rgb(15 23 42 / 0.10);
   --shadow-subtle: 0 0 0 1px rgb(15 23 42 / 0.04);
+  --shadow-primary: 0 8px 20px -6px rgb(79 70 229 / 0.45);
+
+  /* Layout metrics — the fixed app shell */
+  --topbar-h: 4rem;            /* 64px fixed top navigation bar */
+  --sidebar-w: 16rem;          /* 256px expanded sidebar */
+  --sidebar-w-collapsed: 4.75rem; /* 76px collapsed (icon rail) */
+  --sidebar-w-tablet: 4.5rem;  /* 72px tablet icon rail */
 
   /* Spacing / density — switched via [data-density] below.
      Defaults = comfortable. */
   --space-row: 0.875rem;   /* vertical rhythm of a table/list row */
-  --space-cell: 0.75rem;   /* table cell padding */
+  --space-cell: 0.875rem;  /* table cell padding */
   --control-h: 2.75rem;    /* 44px — touch-target height for controls */
 
   /* Z-index / layering scale — keep overlays from fighting */
@@ -63,6 +87,13 @@
   --z-drawer: 1020;
   --z-modal: 1030;
   --z-toast: 1040;
+
+  /* Motion — consistent easing + durations */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
 
   /* Font — wired to Geist in layout.tsx via next CSS vars */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
@@ -76,13 +107,18 @@ html.dark {
   --color-bg: #020617;          /* slate-950 */
   --color-surface: #0f172a;     /* slate-900 */
   --color-surface-2: #1e293b;   /* slate-800 */
-  --color-border: #334155;      /* slate-700 */
+  --color-surface-3: #334155;   /* slate-700 */
+  --color-border: #1e293b;      /* slate-800 */
+  --color-border-strong: #334155; /* slate-700 */
   --color-text: #f1f5f9;        /* slate-100 */
   --color-text-muted: #94a3b8;  /* slate-400 */
+  --color-text-subtle: #64748b; /* slate-500 */
 
   --color-primary: #6366f1;       /* indigo-500 */
   --color-primary-hover: #818cf8; /* indigo-400 */
   --color-primary-fg: #ffffff;
+  --color-primary-soft: #1e1b4b;  /* indigo-950 */
+  --color-primary-soft-fg: #c7d2fe; /* indigo-300 */
 
   --color-success: #10b981;       /* emerald-500 */
   --color-success-fg: #022c22;
@@ -96,23 +132,35 @@ html.dark {
   --color-danger-fg: #1c0f12;
   --color-danger-bg: #881337;     /* rose-900 */
 
+  --color-info: #38bdf8;          /* sky-400 */
+  --color-info-fg: #082f49;
+  --color-info-bg: #0c4a6e;       /* sky-900 */
+
   --color-ring: #818cf8;          /* indigo-400 */
 
+  --gradient-primary: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #4f46e5 100%);
+  --gradient-brand: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
-  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.5), 0 1px 2px -1px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.55), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 12px -4px rgb(0 0 0 / 0.45);
   --shadow-subtle: 0 0 0 1px rgb(255 255 255 / 0.04);
+  --shadow-primary: 0 8px 20px -6px rgb(99 102 249 / 0.5);
 }
 
 /* Density preference — comfortable (default) vs compact.
    Drives row rhythm, cell padding, and control height. */
 :root[data-density="comfortable"] {
   --space-row: 0.875rem;
-  --space-cell: 0.75rem;
+  --space-cell: 0.875rem;
   --control-h: 2.75rem;
 }
 :root[data-density="compact"] {
   --space-row: 0.5rem;
-  --space-cell: 0.5rem;
+  --space-cell: 0.625rem;
   --control-h: 2.25rem;
 }
 
@@ -123,13 +171,18 @@ html.dark {
   --color-bg: var(--color-bg);
   --color-surface: var(--color-surface);
   --color-surface-2: var(--color-surface-2);
+  --color-surface-3: var(--color-surface-3);
   --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
   --color-text: var(--color-text);
   --color-text-muted: var(--color-text-muted);
+  --color-text-subtle: var(--color-text-subtle);
 
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
   --color-primary-fg: var(--color-primary-fg);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-primary-soft-fg: var(--color-primary-soft-fg);
 
   --color-success: var(--color-success);
   --color-success-fg: var(--color-success-fg);
@@ -140,6 +193,9 @@ html.dark {
   --color-danger: var(--color-danger);
   --color-danger-fg: var(--color-danger-fg);
   --color-danger-bg: var(--color-danger-bg);
+  --color-info: var(--color-info);
+  --color-info-fg: var(--color-info-fg);
+  --color-info-bg: var(--color-info-bg);
 
   --color-ring: var(--color-ring);
 
@@ -148,22 +204,34 @@ html.dark {
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
 
+  --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-pop: var(--shadow-pop);
   --shadow-subtle: var(--shadow-subtle);
+  --shadow-primary: var(--shadow-primary);
 
   --spacing-row: var(--space-row);
   --spacing-cell: var(--space-cell);
   --spacing-control: var(--control-h);
+  --spacing-topbar: var(--topbar-h);
+  --spacing-sidebar: var(--sidebar-w);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
+
+  --animate-ease-standard: var(--ease-standard);
+  --animate-ease-spring: var(--ease-spring);
 }
 
 body {
   color: var(--color-text);
   background: var(--color-bg);
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Tabular numerals for money / quantity figures (opt-in via .tabular-nums
@@ -172,7 +240,47 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Honor reduced-motion globally for all transitions/animations. */
+/* Premium thin scrollbars — subtle, themed, non-intrusive. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-subtle);
+}
+
+/* Brand text selection color. */
+::selection {
+  background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  color: var(--color-text);
+}
+
+/* Utility helpers — gradient surfaces (resolved at runtime via tokens). */
+.bg-brand-gradient {
+  background-image: var(--gradient-primary);
+}
+.bg-brand-gradient-soft {
+  background-image: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 12%, transparent) 0%,
+    color-mix(in srgb, var(--color-primary) 4%, transparent) 100%
+  );
+}
+
+/* Honor reduced motion globally for all transitions/animations. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

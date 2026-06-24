@@ -110,7 +110,7 @@ export default function ImportPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Import Invoice" />
+        <PageHeader title="Import Invoice" icon="upload" />
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardBody className="space-y-3">
@@ -133,7 +133,7 @@ export default function ImportPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <PageHeader title="Import Invoice" />
+        <PageHeader title="Import Invoice" icon="upload" />
         <EmptyState
           icon="alert-triangle"
           title="Admins only"
@@ -306,11 +306,11 @@ export default function ImportPage() {
   if (summary) {
     return (
       <div>
-        <PageHeader title="Import Invoice" />
+        <PageHeader title="Import Invoice" icon="upload" />
         <Card className="max-w-md">
           <CardHeader className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-success-bg text-success-fg">
-              <Icon name="check" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-gradient-soft ring-1 ring-success-fg/30 text-success-fg">
+              <Icon name="check" size={20} />
             </span>
             <span className="text-lg font-semibold text-text">Import complete</span>
           </CardHeader>
@@ -337,6 +337,7 @@ export default function ImportPage() {
                 href="/inventory/purchases"
                 className="inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-4 text-sm font-medium text-text shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               >
+                <Icon name="truck" size={16} />
                 View purchases
               </Link>
             </div>
@@ -353,6 +354,7 @@ export default function ImportPage() {
       <PageHeader
         title="Import Invoice"
         subtitle="Upload a supplier invoice PDF, review the extracted lines, then import."
+        icon="upload"
       />
 
       <div className="grid gap-6 md:grid-cols-2">

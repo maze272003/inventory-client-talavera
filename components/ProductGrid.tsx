@@ -46,13 +46,13 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
         {Array.from({ length: 8 }).map((_, i) => (
           <div
             key={i}
-            className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface"
+            className="flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm"
           >
             <Skeleton className="aspect-square w-full rounded-none" />
-            <div className="flex flex-col gap-2 p-2">
+            <div className="flex flex-col gap-2 p-3">
               <Skeleton height={12} width="90%" />
-              <Skeleton height={14} width="40%" />
-              <Skeleton height={16} width="55%" />
+              <Skeleton height={11} width="50%" />
+              <Skeleton height={16} width="60%" />
             </div>
           </div>
         ))}
@@ -83,7 +83,8 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {results.map((product) => {
           const outOfStock = product.stockQty <= 0;
-          const lowStock = product.stockQty > 0 && product.stockQty <= product.reorderThreshold;
+          const lowStock =
+            product.stockQty > 0 && product.stockQty <= product.reorderThreshold;
 
           return (
             <button
@@ -104,15 +105,14 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                 outOfStock ? ", out of stock" : ""
               }`}
               className={[
-                "flex flex-col overflow-hidden rounded-xl border text-left transition-all",
+                "group relative flex flex-col overflow-hidden rounded-xl border text-left transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 outOfStock
-                  ? "cursor-not-allowed border-border bg-surface-2 opacity-50"
-                  : "cursor-pointer border-border bg-surface hover:border-primary hover:shadow-md active:scale-[0.98] motion-reduce:active:scale-100",
+                  ? "cursor-not-allowed border-border bg-surface-2 opacity-60"
+                  : "cursor-pointer border-border bg-surface shadow-sm hover:-translate-y-0.5 hover:border-primary hover:shadow-md motion-reduce:transform-none",
               ].join(" ")}
             >
-              {/* Product image */}
-              <div className="flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-2">
+              <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-brand-gradient-soft">
                 {product.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -120,40 +120,48 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                     alt={product.name}
                     loading="lazy"
                     decoding="async"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
                   />
                 ) : (
-                  <Icon name="package" size={36} className="text-text-muted opacity-50" />
+                  <Icon name="package" size={36} className="text-text-subtle opacity-60" />
+                )}
+                {!outOfStock && (
+                  <span
+                    aria-hidden
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-fg opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100 motion-reduce:transition-none"
+                  >
+                    <Icon name="plus" size={18} />
+                  </span>
+                )}
+                {outOfStock && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-surface/40">
+                    <Badge variant="danger" className="shadow-sm">
+                      Out of stock
+                    </Badge>
+                  </span>
                 )}
               </div>
 
-              {/* Product info */}
-              <div className="flex flex-1 flex-col gap-1 p-2">
-                <p className="line-clamp-2 text-xs font-semibold leading-tight text-text">
+              <div className="flex flex-1 flex-col gap-1 p-3">
+                <p className="line-clamp-2 text-sm font-semibold leading-tight text-text">
                   {product.name}
                 </p>
-                {product.model && (
-                  <p className="truncate text-xs text-text-muted">{product.model}</p>
-                )}
-                <p className="truncate text-[11px] text-text-muted">SKU {product.sku}</p>
-                {product.nextBatchNumber && (
-                  <p className="truncate text-[11px] font-medium text-text-muted">
-                    Batch {product.nextBatchNumber}
-                    {product.activeBatchCount > 1 ? ` ·${product.activeBatchCount}` : ""}
-                  </p>
-                )}
-                <p className="mt-auto text-sm font-bold tabular-nums text-primary">
-                  {formatPeso(product.sellPrice)}
+                <p className="truncate text-[11px] text-text-muted">
+                  SKU {product.sku}
                 </p>
-
-                {/* Stock badge */}
-                {outOfStock ? (
-                  <Badge variant="danger">Out of stock</Badge>
-                ) : lowStock ? (
-                  <Badge variant="warning">Stock: {product.stockQty}</Badge>
-                ) : (
-                  <Badge variant="success">Stock: {product.stockQty}</Badge>
-                )}
+                <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+                  <span className="text-base font-bold tabular-nums text-primary">
+                    {formatPeso(product.sellPrice)}
+                  </span>
+                  {!outOfStock &&
+                    (lowStock ? (
+                      <Badge variant="warning">Stock: {product.stockQty}</Badge>
+                    ) : (
+                      <Badge variant="success">
+                        Stock: {product.stockQty}
+                      </Badge>
+                    ))}
+                </div>
               </div>
             </button>
           );

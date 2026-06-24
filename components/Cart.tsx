@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso } from "@/lib/format";
 import type { CartItem } from "./ProductSearch";
-import { EmptyState, Icon, Badge } from "@/components/ui";
+import { EmptyState, Icon, Badge, Button } from "@/components/ui";
 
 function BatchPreview({
   productId,
@@ -27,10 +27,13 @@ function BatchPreview({
   if (parts.length === 0) return null;
   return (
     <p
-      className="truncate text-[11px] text-text-muted"
+      className="truncate text-[11px] text-text-subtle"
       title={parts.join(", ")}
     >
-      FIFO: {parts.join(", ")}
+      <span className="inline-flex items-center gap-1 align-middle">
+        <Icon name="layers" size={11} className="shrink-0 text-text-subtle" />
+        FIFO: {parts.join(", ")}
+      </span>
       {need > 0 ? " (short!)" : ""}
     </p>
   );
@@ -42,8 +45,6 @@ type Props = {
 };
 
 export default function Cart({ items, onUpdate }: Props) {
-  const total = items.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0);
-
   function updateQty(index: number, delta: number) {
     const updated = items.map((item, i) => {
       if (i !== index) return item;
@@ -59,110 +60,118 @@ export default function Cart({ items, onUpdate }: Props) {
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-text">
-        <Icon name="shopping-cart" size={18} className="text-text-muted" />
-        Cart
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-cell py-row">
+        <h2 className="flex items-center gap-2 text-base font-semibold text-text">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Icon name="shopping-cart" size={16} />
+          </span>
+          Current Sale
+          {items.length > 0 && (
+            <Badge variant="primary" aria-label={`${items.length} line items`}>
+              {items.length}
+            </Badge>
+          )}
+        </h2>
         {items.length > 0 && (
-          <Badge variant="primary" aria-label={`${items.length} line items`}>
-            {items.length}
-          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onUpdate([])}
+            leftIcon={<Icon name="trash" size={14} />}
+          >
+            Clear
+          </Button>
         )}
-      </h2>
+      </div>
 
       {items.length === 0 ? (
-        <EmptyState
-          icon="shopping-cart"
-          title="Cart is empty"
-          description="Scan a barcode or tap a product to add it."
-        />
+        <div className="flex min-h-[180px] flex-1 items-center justify-center">
+          <EmptyState
+            icon="shopping-cart"
+            title="Cart is empty"
+            description="Scan a barcode or tap a product to add it."
+          />
+        </div>
       ) : (
-        <>
-          <ul className="flex-1 space-y-2 overflow-y-auto">
-            {items.map((item, index) => {
-              const lineTotal = item.sellPrice * item.quantity;
-              const overStock = item.quantity > item.stockQty;
-              return (
-                <li
-                  key={item.productId}
-                  className={[
-                    "rounded-lg border p-cell",
-                    overStock
-                      ? "border-warning-fg/40 bg-warning-bg"
-                      : "border-border bg-surface",
-                  ].join(" ")}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-text">
-                        {item.name}
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-cell">
+          {items.map((item, index) => {
+            const lineTotal = item.sellPrice * item.quantity;
+            const overStock = item.quantity > item.stockQty;
+            return (
+              <li
+                key={item.productId}
+                className={[
+                  "rounded-lg border p-3 transition-colors",
+                  overStock
+                    ? "border-warning-fg/40 bg-warning-bg"
+                    : "border-border bg-surface",
+                ].join(" ")}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-text">
+                      {item.name}
+                    </p>
+                    <p className="truncate text-xs text-text-muted">
+                      {item.sku} <span aria-hidden>·</span>{" "}
+                      {formatPeso(item.sellPrice)} each
+                    </p>
+                    <BatchPreview
+                      productId={item.productId}
+                      quantity={item.quantity}
+                    />
+                    {overStock && (
+                      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-warning-fg">
+                        <Icon name="alert-triangle" size={12} />
+                        Qty exceeds stock ({item.stockQty} available)
                       </p>
-                      <p className="text-xs text-text-muted">
-                        {item.sku} &middot; {formatPeso(item.sellPrice)} each
-                      </p>
-                      <BatchPreview
-                        productId={item.productId}
-                        quantity={item.quantity}
-                      />
-                      {overStock && (
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-warning-fg">
-                          <Icon name="alert-triangle" size={12} />
-                          Qty exceeds stock ({item.stockQty} available)
-                        </p>
-                      )}
-                    </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-subtle transition-colors hover:bg-surface-2 hover:text-danger-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    aria-label={`Remove ${item.name} from cart`}
+                  >
+                    <Icon name="trash" size={15} />
+                  </button>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => removeItem(index)}
-                      className="-mr-1 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-2 hover:text-danger-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`Remove ${item.name} from cart`}
+                      onClick={() => updateQty(index, -1)}
+                      disabled={item.quantity <= 1}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Decrease quantity of ${item.name}`}
                     >
-                      <Icon name="trash" size={16} />
+                      <Icon name="minus" size={16} />
+                    </button>
+                    <span
+                      className="w-10 text-center text-sm font-semibold tabular-nums text-text"
+                      aria-label={`Quantity ${item.quantity}`}
+                    >
+                      {item.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateQty(index, 1)}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      aria-label={`Increase quantity of ${item.name}`}
+                    >
+                      <Icon name="plus" size={16} />
                     </button>
                   </div>
-
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => updateQty(index, -1)}
-                        disabled={item.quantity <= 1}
-                        className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label={`Decrease quantity of ${item.name}`}
-                      >
-                        <Icon name="minus" size={16} />
-                      </button>
-                      <span
-                        className="w-9 text-center text-sm font-medium tabular-nums text-text"
-                        aria-label={`Quantity ${item.quantity}`}
-                      >
-                        {item.quantity}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => updateQty(index, 1)}
-                        className="flex h-9 w-9 items-center justify-center rounded-md border border-border text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        aria-label={`Increase quantity of ${item.name}`}
-                      >
-                        <Icon name="plus" size={16} />
-                      </button>
-                    </div>
-                    <span className="text-sm font-semibold tabular-nums text-text">
-                      {formatPeso(lineTotal)}
-                    </span>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-
-          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
-            <span className="text-sm font-semibold text-text">Total</span>
-            <span className="text-xl font-bold tabular-nums text-text">
-              {formatPeso(total)}
-            </span>
-          </div>
-        </>
+                  <span className="text-sm font-bold tabular-nums text-text">
+                    {formatPeso(lineTotal)}
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

@@ -14,7 +14,6 @@ import { formatPeso } from "@/lib/format";
 import {
   PageHeader,
   Card,
-  CardHeader,
   CardBody,
   Button,
   Field,
@@ -49,7 +48,6 @@ export default function PosPage() {
 
   function handleAddToCart(item: CartItem) {
     setCart((prev) => {
-      // If the same product already exists, increment its quantity
       const existing = prev.findIndex((i) => i.productId === item.productId);
       if (existing >= 0) {
         return prev.map((i, idx) =>
@@ -78,7 +76,6 @@ export default function PosPage() {
       });
       setCompletedSaleId(result.saleId);
       success("Sale complete", `Change due ${formatPeso(change)}`);
-      // Don't clear cart yet — keep visible until "New Sale" is clicked
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -89,10 +86,8 @@ export default function PosPage() {
     }
   }, [canComplete, createSale, cart, tendered, change, success, toastError]);
 
-  // ── Keyboard shortcuts ────────────────────────────────────────────────────
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // Don't hijack typing in inputs except for the documented combos.
       const target = e.target as HTMLElement | null;
       const inField =
         target &&
@@ -100,19 +95,16 @@ export default function PosPage() {
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
 
-      // "?" opens help (only when not typing).
       if (e.key === "?" && !inField) {
         e.preventDefault();
         setHelpOpen(true);
         return;
       }
-      // "/" focuses the search box.
       if (e.key === "/" && !inField) {
         e.preventDefault();
         searchRef.current?.focus();
         return;
       }
-      // Ctrl/Cmd+Enter completes the sale.
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         if (completedSaleId === null) {
@@ -120,7 +112,6 @@ export default function PosPage() {
         }
         return;
       }
-      // Ctrl/Cmd+N starts a new sale.
       if ((e.ctrlKey || e.metaKey) && (e.key === "n" || e.key === "N")) {
         e.preventDefault();
         handleNewSale();
@@ -157,41 +148,51 @@ export default function PosPage() {
     </Dialog>
   );
 
-  // ── Receipt view (after successful sale) ──────────────────────────────────
   if (completedSaleId !== null) {
     return (
       <div>
-        <PageHeader
-          title="Sale complete"
-          subtitle="Receipt ready to print"
-          actions={
-            <Button
-              variant="primary"
-              onClick={handleNewSale}
-              leftIcon={<Icon name="plus" size={18} />}
-            >
-              New Sale
-            </Button>
-          }
-        />
+        <div className="mb-6 flex flex-col items-center gap-4 text-center sm:flex-row sm:justify-between sm:text-left">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-success-bg text-success-fg">
+              <Icon name="check-circle" size={26} />
+            </span>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-text sm:text-2xl">
+                Sale complete
+              </h1>
+              <p className="mt-0.5 text-sm text-text-muted">
+                Change due{" "}
+                <span className="font-semibold text-success-fg">
+                  {formatPeso(change)}
+                </span>
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleNewSale}
+            leftIcon={<Icon name="plus" size={18} />}
+            className="shadow-primary!"
+          >
+            New Sale
+          </Button>
+        </div>
         <Receipt saleId={completedSaleId} />
         {helpDialog}
       </div>
     );
   }
 
-  // ── Payment panel (shared between desktop column and mobile sheet) ─────────
   const paymentPanel = (
     <div className="space-y-4">
-      {/* Order total */}
-      <div className="flex items-center justify-between border-y border-border py-3">
-        <span className="text-sm text-text-muted">Order Total</span>
+      <div className="flex items-end justify-between gap-2">
+        <span className="text-sm font-medium text-text-muted">Total</span>
         <span className="text-2xl font-bold tabular-nums text-text">
           {formatPeso(total)}
         </span>
       </div>
 
-      {/* Cash tendered */}
       <Field label="Cash Tendered (₱)">
         <Input
           id="cash-tendered"
@@ -206,17 +207,18 @@ export default function PosPage() {
         />
       </Field>
 
-      {/* Change */}
       {tendered >= total && tendered > 0 && (
         <div className="flex items-center justify-between rounded-lg bg-success-bg px-4 py-3">
-          <span className="text-sm font-medium text-success-fg">Change</span>
+          <span className="flex items-center gap-1.5 text-sm font-medium text-success-fg">
+            <Icon name="wallet" size={16} />
+            Change
+          </span>
           <span className="text-xl font-bold tabular-nums text-success-fg">
             {formatPeso(change)}
           </span>
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div
           role="alert"
@@ -227,13 +229,14 @@ export default function PosPage() {
         </div>
       )}
 
-      {/* Complete Sale */}
       <Button
         size="lg"
         fullWidth
         onClick={handleCompleteSale}
         disabled={!canComplete}
         loading={isSubmitting}
+        rightIcon={<Icon name="arrow-right" size={18} />}
+        className="shadow-primary!"
       >
         {isSubmitting ? "Processing" : "Complete Sale"}
       </Button>
@@ -251,92 +254,84 @@ export default function PosPage() {
     </div>
   );
 
-  // ── POS view ──────────────────────────────────────────────────────────────
   return (
-    <div className="pb-28 xl:pb-0">
-      <PageHeader
-        title="Point of Sale"
-        subtitle={cart.length > 0 ? `${itemCount} item(s) in cart` : "Scan or browse to start a sale"}
-        actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setHelpOpen(true)}
-            aria-label="Keyboard shortcuts"
-            leftIcon={<Icon name="info" size={16} />}
-          >
-            Shortcuts
-          </Button>
-        }
-      />
+    <div>
+      <div className="pb-28 xl:pb-0 xl:flex xl:h-[calc(100vh-var(--topbar-h)-3rem)] xl:flex-col">
+        <PageHeader
+          className="xl:shrink-0"
+          title="Point of Sale"
+          subtitle={
+            cart.length > 0
+              ? `${itemCount} item(s) in cart`
+              : "Scan or browse to start a sale"
+          }
+          actions={
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setHelpOpen(true)}
+              aria-label="Keyboard shortcuts"
+              leftIcon={<Icon name="info" size={16} />}
+            >
+              Shortcuts
+            </Button>
+          }
+        />
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* Left + centre: scan box, product grid, cart */}
-        <div className="space-y-4 xl:col-span-2">
-          {/* Scan / SKU lookup */}
-          <Card>
-            <CardBody>
-              <ProductSearch ref={searchRef} onAddToCart={handleAddToCart} />
-            </CardBody>
-          </Card>
+        <div className="grid grid-cols-1 gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[1fr_22rem] xl:gap-6">
+          <section className="space-y-4 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
+            <Card>
+              <CardBody>
+                <ProductSearch ref={searchRef} onAddToCart={handleAddToCart} />
+              </CardBody>
+            </Card>
 
-          {/* Browse grid */}
-          <Card>
-            <CardBody className="space-y-3">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <Field label="Browse products" className="flex-1">
-                  <Input
-                    id="grid-search"
-                    type="text"
-                    value={gridSearch}
-                    onChange={(e) => setGridSearch(e.target.value)}
-                    placeholder="Filter by name…"
-                  />
-                </Field>
-                <PosFilters value={stockFilter} onChange={setStockFilter} />
-              </div>
-              <CategoryChips value={category} onChange={setCategory} />
-              <div className="max-h-[60vh] overflow-y-auto sm:max-h-[70vh]">
-                <ProductGrid
-                  search={gridSearch}
-                  category={category}
-                  stockFilter={stockFilter}
-                  onAdd={handleAddToCart}
-                />
-              </div>
-            </CardBody>
-          </Card>
+            <Card>
+              <CardBody className="space-y-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <Field label="Browse products" className="flex-1">
+                    <Input
+                      id="grid-search"
+                      type="text"
+                      value={gridSearch}
+                      onChange={(e) => setGridSearch(e.target.value)}
+                      placeholder="Filter by name…"
+                    />
+                  </Field>
+                  <PosFilters value={stockFilter} onChange={setStockFilter} />
+                </div>
+                <CategoryChips value={category} onChange={setCategory} />
+              </CardBody>
+            </Card>
 
-          {/* Cart */}
-          <Card>
-            <CardBody className="min-h-[200px]">
+            <ProductGrid
+              search={gridSearch}
+              category={category}
+              stockFilter={stockFilter}
+              onAdd={handleAddToCart}
+            />
+          </section>
+
+          <aside className="flex xl:min-h-0">
+            <Card className="flex w-full flex-col overflow-hidden xl:h-full xl:min-h-0">
               <Cart items={cart} onUpdate={setCart} />
-            </CardBody>
-          </Card>
+              <div className="hidden shrink-0 border-t border-border p-cell xl:block">
+                {paymentPanel}
+              </div>
+            </Card>
+          </aside>
         </div>
-
-        {/* Right column: payment (desktop) */}
-        <Card className="hidden self-start xl:block">
-          <CardHeader>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-text">
-              <Icon name="receipt" size={18} className="text-text-muted" />
-              Payment
-            </h2>
-          </CardHeader>
-          <CardBody>{paymentPanel}</CardBody>
-        </Card>
       </div>
 
-      {/* Mobile/tablet: payment as a sticky bottom sheet */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface shadow-md xl:hidden">
+      <div className="sticky bottom-0 z-20 border-t border-border bg-surface/95 shadow-[0_-4px_12px_-4px_rgb(15_23_42/0.12)] backdrop-blur xl:hidden">
         <details className="group">
           <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <Icon name="shopping-cart" size={20} className="text-text-muted" />
-              <span className="text-sm font-medium text-text">Payment</span>
-              {cart.length > 0 && (
-                <Badge variant="primary">{itemCount}</Badge>
-              )}
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon name="shopping-cart" size={18} />
+              </span>
+              <span className="text-sm font-semibold text-text">Cart</span>
+              {cart.length > 0 && <Badge variant="primary">{itemCount}</Badge>}
             </span>
             <span className="flex items-center gap-2">
               <span className="text-lg font-bold tabular-nums text-text">
@@ -349,7 +344,7 @@ export default function PosPage() {
               />
             </span>
           </summary>
-          <div className="max-h-[60vh] overflow-y-auto border-t border-border px-4 py-4">
+          <div className="max-h-[70vh] overflow-y-auto border-t border-border px-4 py-4">
             {paymentPanel}
           </div>
         </details>

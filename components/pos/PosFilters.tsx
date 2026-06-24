@@ -7,6 +7,7 @@ type Props = { value: StockFilter; onChange: (v: StockFilter) => void };
 export default function PosFilters({ value, onChange }: Props) {
   return (
     <SegmentedControl
+      size="sm"
       value={value}
       onChange={(v) => onChange(v as StockFilter)}
       options={[

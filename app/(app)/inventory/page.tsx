@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -11,14 +12,17 @@ import {
   PageHeader,
   Card,
   CardBody,
+  CardHeader,
   Input,
   Button,
   Badge,
+  Icon,
   ResponsiveTable,
   EmptyState,
   Skeleton,
   SkeletonText,
   Spinner,
+  cn,
 } from "@/components/ui";
 
 type ProductDoc = {
@@ -67,22 +71,33 @@ function ProductPickerAndActions() {
   }
 
   const isLoadingFirst = status === "LoadingFirstPage";
+  const rows = results as ProductDoc[];
 
   return (
     <div>
-      <h2 className="text-base font-semibold text-text mb-3">Products</h2>
-
-      <div className="mb-3 max-w-sm">
-        <Input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search products..."
-          aria-label="Search products"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h2 className="text-base font-semibold text-text flex items-center gap-2">
+          <Icon name="box" size={18} className="text-primary" />
+          Products
+        </h2>
+        <div className="relative w-full sm:w-72">
+          <Icon
+            name="search"
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+          />
+          <Input
+            type="text"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search products..."
+            aria-label="Search products"
+            className="pl-9"
+          />
+        </div>
       </div>
 
-      <Card className="overflow-hidden">
+      <Card className="overflow-hidden shadow-sm">
         {isLoadingFirst ? (
           <CardBody>
             <div className="space-y-row" aria-busy="true" aria-label="Loading products">
@@ -102,19 +117,28 @@ function ProductPickerAndActions() {
         ) : (
           <ResponsiveTable<ProductDoc>
             caption="Products and stock actions"
-            rows={results as ProductDoc[]}
+            rows={rows}
             rowKey={(p) => p._id}
             columns={[
               {
                 key: "name",
                 header: "Product",
                 cell: (p) => (
-                  <span className="font-medium text-text">
-                    {p.name}
+                  <div className="min-w-0">
+                    <span className="font-medium text-text">
+                      {p.name}
+                    </span>
                     {!p.isActive && (
                       <span className="ml-2 text-xs text-text-muted">(inactive)</span>
                     )}
-                  </span>
+                  </div>
+                ),
+              },
+              {
+                key: "category",
+                header: "Category",
+                cell: (p) => (
+                  <Badge variant="neutral">{p.category}</Badge>
                 ),
               },
               {
@@ -129,18 +153,21 @@ function ProductPickerAndActions() {
                 header: "Stock",
                 align: "right",
                 cell: (p) => {
-                  const isLowStock = p.stockQty <= p.reorderThreshold;
+                  const isOut = p.stockQty <= 0;
+                  const isLow = !isOut && p.stockQty <= p.reorderThreshold;
                   return (
-                    <span className="inline-flex items-center gap-2 justify-end">
+                    <div className="inline-flex items-center gap-1.5 justify-end">
                       <span
-                        className={`figure-nums font-medium ${
-                          isLowStock ? "text-danger-fg" : "text-text"
-                        }`}
+                        className={cn(
+                          "font-semibold tabular-nums",
+                          isOut ? "text-danger-fg" : isLow ? "text-warning-fg" : "text-text"
+                        )}
                       >
                         {p.stockQty}
                       </span>
-                      {isLowStock && <Badge variant="danger">Low</Badge>}
-                    </span>
+                      {isOut && <Badge variant="danger">Out</Badge>}
+                      {isLow && <Badge variant="warning">Low</Badge>}
+                    </div>
                   );
                 },
               },
@@ -154,6 +181,7 @@ function ProductPickerAndActions() {
                     <Button
                       size="sm"
                       variant="secondary"
+                      leftIcon={<Icon name="plus" className="w-4 h-4" />}
                       onClick={() => setDialog({ type: "stockIn", product: p })}
                     >
                       Stock In
@@ -161,6 +189,7 @@ function ProductPickerAndActions() {
                     <Button
                       size="sm"
                       variant="secondary"
+                      leftIcon={<Icon name="sliders" className="w-4 h-4" />}
                       onClick={() => setDialog({ type: "adjust", product: p })}
                     >
                       Adjust
@@ -168,6 +197,7 @@ function ProductPickerAndActions() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      leftIcon={<Icon name="history" className="w-4 h-4" />}
                       onClick={() => setDialog({ type: "ledger", product: p })}
                     >
                       Ledger
@@ -205,7 +235,6 @@ function ProductPickerAndActions() {
         )}
       </Card>
 
-      {/* Dialogs */}
       <StockInDialog
         key={dialog?.type === "stockIn" ? `stockIn-${dialog.product._id}` : "stockIn"}
         open={dialog?.type === "stockIn"}
@@ -238,10 +267,13 @@ function LowStockSection() {
   if (lowStock === undefined) {
     return (
       <div className="mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Skeleton height={20} width={160} />
-        </div>
         <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Skeleton height={32} width={32} rounded />
+              <Skeleton height={20} width={160} />
+            </div>
+          </CardHeader>
           <CardBody>
             <SkeletonText lines={2} />
           </CardBody>
@@ -254,33 +286,71 @@ function LowStockSection() {
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-base font-semibold text-text">Low Stock Alerts</h2>
-        <Badge variant="danger">{lowStock.length}</Badge>
-      </div>
-      <div className="rounded-xl border border-danger-fg/30 bg-danger-bg p-cell">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {lowStock.map((product) => (
-            <div
-              key={product._id}
-              className="bg-surface rounded-lg border border-border px-cell py-row flex items-center justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-text truncate">{product.name}</p>
-                <p className="text-xs text-text-muted font-mono truncate">{product.sku}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-danger-fg figure-nums">
-                  {product.stockQty}
-                </p>
-                <p className="text-xs text-text-muted">
-                  threshold: <span className="figure-nums">{product.reorderThreshold}</span>
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <Card className="overflow-hidden border-danger-fg/30 shadow-sm">
+        <CardHeader className="bg-danger-bg/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-danger-bg text-danger-fg">
+              <Icon name="alert-triangle" size={18} />
+            </span>
+            <h2 className="text-base font-semibold text-text truncate">
+              Low Stock Alerts
+            </h2>
+            <Badge variant="danger" className="tabular-nums">
+              {lowStock.length}
+            </Badge>
+          </div>
+          <Link
+            href="/inventory/import"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-3 text-sm font-medium text-text shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            <Icon name="truck" size={16} />
+            <span className="hidden sm:inline">Restock</span>
+          </Link>
+        </CardHeader>
+        <CardBody>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {lowStock.map((product) => {
+              const isOut = product.stockQty <= 0;
+              return (
+                <div
+                  key={product._id}
+                  className={cn(
+                    "bg-surface rounded-lg border px-cell py-row flex items-center justify-between gap-3 transition-shadow hover:shadow-sm",
+                    isOut ? "border-danger-fg/30" : "border-border"
+                  )}
+                >
+                  <div className="min-w-0 flex items-center gap-2.5">
+                    <span
+                      className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                        isOut ? "bg-danger-bg text-danger-fg" : "bg-warning-bg text-warning-fg"
+                      )}
+                    >
+                      <Icon name="package" size={16} />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text truncate">
+                        {product.name}
+                      </p>
+                      <p className="text-xs text-text-muted font-mono truncate">
+                        {product.sku}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-base font-bold text-danger-fg tabular-nums">
+                      {product.stockQty}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      of <span className="tabular-nums">{product.reorderThreshold}</span>
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }
@@ -291,7 +361,7 @@ export default function InventoryPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Inventory" />
+        <PageHeader title="Inventory" subtitle="Stock levels & movements" icon="boxes" />
         <div className="space-y-6">
           <Card>
             <CardBody>
@@ -311,9 +381,9 @@ export default function InventoryPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <PageHeader title="Inventory" />
+        <PageHeader title="Inventory" subtitle="Stock levels & movements" icon="boxes" />
         <EmptyState
-          icon="info"
+          icon="shield"
           title="Admins only"
           description="You do not have permission to view inventory management."
         />
@@ -323,7 +393,7 @@ export default function InventoryPage() {
 
   return (
     <div>
-      <PageHeader title="Inventory" subtitle="Manage stock levels and movements" />
+      <PageHeader title="Inventory" subtitle="Stock levels & movements" icon="boxes" />
       <LowStockSection />
       <ProductPickerAndActions />
     </div>

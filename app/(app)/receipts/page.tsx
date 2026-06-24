@@ -10,7 +10,7 @@ import {
   PageHeader,
   Card,
   CardBody,
-  Field,
+  Label,
   Input,
   Button,
   Badge,
@@ -42,7 +42,6 @@ export default function ReceiptsPage() {
 
   const [searchInput, setSearchInput] = useState("");
 
-  // Parse a positive integer from the search input, or undefined to list all
   const searchNum = (() => {
     const n = parseInt(searchInput.trim(), 10);
     return Number.isInteger(n) && n > 0 ? n : undefined;
@@ -57,7 +56,6 @@ export default function ReceiptsPage() {
   const isLoadingFirstPage = status === "LoadingFirstPage";
   const isEmpty = results.length === 0 && status === "Exhausted";
 
-  // Archive flow
   const archiveSale = useMutation(api.sales.archive);
   const [toArchive, setToArchive] = useState<ReceiptRow | null>(null);
   const [archiving, setArchiving] = useState(false);
@@ -82,7 +80,6 @@ export default function ReceiptsPage() {
     }
   }
 
-  // Archived receipts dialog
   const [archivedOpen, setArchivedOpen] = useState(false);
 
   const columns: Column<ReceiptRow>[] = [
@@ -99,7 +96,9 @@ export default function ReceiptsPage() {
       key: "date",
       header: "Date",
       cell: (sale) => (
-        <span className="text-text-muted">{formatDate(sale._creationTime)}</span>
+        <span className="text-text-muted whitespace-nowrap">
+          {formatDate(sale._creationTime)}
+        </span>
       ),
     },
     {
@@ -122,14 +121,13 @@ export default function ReceiptsPage() {
       header: "Total",
       align: "right",
       cell: (sale) => (
-        <span className="font-semibold text-text figure-nums">
+        <span className="font-bold text-text tabular-nums">
           {formatPeso(sale.total)}
         </span>
       ),
     },
   ];
 
-  // Admins get an Archive action column.
   if (isAdmin) {
     columns.push({
       key: "actions",
@@ -140,7 +138,7 @@ export default function ReceiptsPage() {
         <Button
           variant="ghost"
           size="sm"
-          leftIcon={<Icon name="package" size={16} />}
+          leftIcon={<Icon name="box" size={16} />}
           onClick={(e) => {
             e.stopPropagation();
             setToArchive(sale);
@@ -157,12 +155,13 @@ export default function ReceiptsPage() {
     <div>
       <PageHeader
         title="Receipts"
-        subtitle="Browse and search past sales"
+        icon="receipt"
+        subtitle="Browse & search past sales"
         actions={
           isAdmin ? (
             <Button
               variant="secondary"
-              leftIcon={<Icon name="package" size={16} />}
+              leftIcon={<Icon name="box" size={16} />}
               onClick={() => setArchivedOpen(true)}
             >
               Archived receipts
@@ -171,45 +170,49 @@ export default function ReceiptsPage() {
         }
       />
 
-      {/* Search */}
       <Card className="mb-6">
         <CardBody>
-          <Field
-            label="Search by receipt number"
-            hint="Enter a receipt number to filter, or leave blank to list all."
-            className="max-w-xs"
-          >
-            <Input
-              type="text"
-              inputMode="numeric"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Enter receipt number…"
-              aria-label="Search by receipt number"
-            />
-          </Field>
+          <div className="flex flex-col gap-1.5 max-w-md">
+            <Label>Search by receipt number</Label>
+            <div className="relative">
+              <Icon
+                name="search"
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+              />
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                placeholder="Enter receipt number…"
+                aria-label="Search by receipt number"
+                className="pl-9"
+              />
+            </div>
+            <p className="text-xs text-text-muted">
+              Enter a receipt number to filter, or leave blank to list all.
+            </p>
+          </div>
         </CardBody>
       </Card>
 
-      {/* List */}
       {isLoadingFirstPage ? (
-        <Card>
-          <CardBody>
-            <div className="space-y-4" aria-busy="true" aria-live="polite">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-4 border-b border-border py-row last:border-0"
-                >
-                  <Skeleton height={18} width="20%" />
-                  <Skeleton height={14} width="25%" />
-                  <Skeleton height={14} width="20%" />
-                  <Skeleton height={18} width="15%" />
-                </div>
-              ))}
-              <span className="sr-only">Loading receipts…</span>
-            </div>
-          </CardBody>
+        <Card className="overflow-hidden shadow-sm">
+          <div className="divide-y divide-border" aria-busy="true" aria-live="polite">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between gap-4 px-cell py-row"
+              >
+                <Skeleton height={18} width="18%" />
+                <Skeleton height={14} width="22%" />
+                <Skeleton height={20} width="14%" rounded />
+                <Skeleton height={18} width="16%" />
+              </div>
+            ))}
+            <span className="sr-only">Loading receipts…</span>
+          </div>
         </Card>
       ) : isEmpty ? (
         <EmptyState
@@ -229,7 +232,7 @@ export default function ReceiptsPage() {
           }
         />
       ) : (
-        <>
+        <Card className="overflow-hidden shadow-sm">
           <ResponsiveTable<ReceiptRow>
             caption="Receipts"
             rows={results as ReceiptRow[]}
@@ -238,11 +241,10 @@ export default function ReceiptsPage() {
             onRowClick={(sale) => router.push(`/receipts/${sale._id}`)}
           />
 
-          {/* Load more */}
           {status === "CanLoadMore" && (
-            <div className="mt-6 flex justify-center">
+            <div className="flex justify-center py-row border-t border-border">
               <Button
-                variant="secondary"
+                variant="ghost"
                 onClick={() => loadMore(20)}
                 leftIcon={<Icon name="chevron-down" size={16} />}
               >
@@ -251,15 +253,18 @@ export default function ReceiptsPage() {
             </div>
           )}
           {status === "LoadingMore" && (
-            <div className="mt-6" aria-busy="true" aria-live="polite">
-              <SkeletonText lines={2} />
+            <div
+              className="flex justify-center py-row border-t border-border"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <Skeleton height={16} width={140} />
               <span className="sr-only">Loading more receipts…</span>
             </div>
           )}
-        </>
+        </Card>
       )}
 
-      {/* Archive confirmation */}
       <ConfirmDialog
         open={toArchive !== null}
         onClose={() => {
@@ -278,7 +283,6 @@ export default function ReceiptsPage() {
         loading={archiving}
       />
 
-      {/* Archived receipts */}
       {isAdmin && (
         <ArchivedReceiptsDialog
           open={archivedOpen}
@@ -346,7 +350,9 @@ function ArchivedReceiptsDialog({
       key: "date",
       header: "Date",
       cell: (sale) => (
-        <span className="text-text-muted">{formatDate(sale._creationTime)}</span>
+        <span className="text-text-muted whitespace-nowrap">
+          {formatDate(sale._creationTime)}
+        </span>
       ),
     },
     {
@@ -359,7 +365,7 @@ function ArchivedReceiptsDialog({
       header: "Total",
       align: "right",
       cell: (sale) => (
-        <span className="font-semibold text-text figure-nums">
+        <span className="font-bold text-text tabular-nums">
           {formatPeso(sale.total)}
         </span>
       ),
@@ -374,7 +380,7 @@ function ArchivedReceiptsDialog({
           variant="secondary"
           size="sm"
           loading={restoringId === sale._id}
-          leftIcon={<Icon name="refresh" size={16} />}
+          leftIcon={<Icon name="rotate-ccw" size={16} />}
           onClick={() => handleRestore(sale)}
           aria-label={`Restore receipt #${sale.receiptNumber}`}
         >
@@ -393,22 +399,22 @@ function ArchivedReceiptsDialog({
       size="lg"
     >
       {isLoadingFirstPage ? (
-        <div className="space-y-4" aria-busy="true" aria-live="polite">
+        <div className="divide-y divide-border" aria-busy="true" aria-live="polite">
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="flex items-center justify-between gap-4 border-b border-border py-row last:border-0"
+              className="flex items-center justify-between gap-4 px-cell py-row"
             >
-              <Skeleton height={18} width="20%" />
-              <Skeleton height={14} width="25%" />
-              <Skeleton height={18} width="15%" />
+              <Skeleton height={18} width="18%" />
+              <Skeleton height={14} width="24%" />
+              <Skeleton height={18} width="16%" />
             </div>
           ))}
           <span className="sr-only">Loading archived receipts…</span>
         </div>
       ) : isEmpty ? (
         <EmptyState
-          icon="package"
+          icon="box"
           title="No archived receipts"
           description="Receipts you archive will appear here."
         />
@@ -422,7 +428,7 @@ function ArchivedReceiptsDialog({
           />
 
           {status === "CanLoadMore" && (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-4 flex justify-center">
               <Button
                 variant="secondary"
                 onClick={() => loadMore(20)}
@@ -433,7 +439,7 @@ function ArchivedReceiptsDialog({
             </div>
           )}
           {status === "LoadingMore" && (
-            <div className="mt-6" aria-busy="true" aria-live="polite">
+            <div className="mt-4" aria-busy="true" aria-live="polite">
               <SkeletonText lines={2} />
               <span className="sr-only">Loading more archived receipts…</span>
             </div>

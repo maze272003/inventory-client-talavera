@@ -16,6 +16,7 @@ import {
   ResponsiveTable,
   Skeleton,
   Select,
+  cn,
   useToast,
   type Column,
 } from "@/components/ui";
@@ -32,6 +33,19 @@ type Row = {
   totalSales: number;
 };
 
+function initialsFor(name: string): string {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
 export default function UsersPage() {
   const currentUser = useQuery(api.users.currentUser);
   const isAdmin = currentUser?.role === "admin";
@@ -47,12 +61,26 @@ export default function UsersPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Users" />
-        <Card>
-          <div className="p-cell space-y-3">
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
+        <PageHeader
+          title="Users"
+          icon="users"
+          subtitle="Manage cashier & admin accounts"
+        />
+        <Card className="overflow-hidden shadow-sm">
+          <div className="divide-y divide-border" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-cell py-row"
+              >
+                <Skeleton height={36} width={36} rounded />
+                <div className="flex-1 space-y-2">
+                  <Skeleton height={14} width="40%" />
+                  <Skeleton height={12} width="55%" />
+                </div>
+                <Skeleton height={36} width={120} />
+              </div>
+            ))}
           </div>
         </Card>
       </div>
@@ -62,9 +90,13 @@ export default function UsersPage() {
   if (!isAdmin) {
     return (
       <div>
-        <PageHeader title="Users" />
+        <PageHeader
+          title="Users"
+          icon="users"
+          subtitle="Manage cashier & admin accounts"
+        />
         <EmptyState
-          icon="user"
+          icon="shield"
           title="Admins only"
           description="You do not have permission to view this page."
         />
@@ -107,9 +139,16 @@ export default function UsersPage() {
       key: "name",
       header: "Name",
       cell: (r) => (
-        <div>
-          <div className="text-text">{r.name}</div>
-          <div className="text-text-muted text-xs">{r.email ?? "—"}</div>
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+            {initialsFor(r.name)}
+          </span>
+          <div className="min-w-0">
+            <div className="text-text font-medium truncate">{r.name}</div>
+            <div className="text-text-muted text-xs truncate">
+              {r.email ?? "—"}
+            </div>
+          </div>
         </div>
       ),
     },
@@ -123,6 +162,7 @@ export default function UsersPage() {
             onRoleChange(r, e.target.value as "admin" | "cashier")
           }
           disabled={r.userId === currentUser._id}
+          className="w-32"
         >
           <option value="cashier">Cashier</option>
           <option value="admin">Admin</option>
@@ -134,6 +174,12 @@ export default function UsersPage() {
       header: "Status",
       cell: (r) => (
         <Badge variant={r.disabled ? "neutral" : "success"}>
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full",
+              r.disabled ? "bg-text-muted" : "bg-success"
+            )}
+          />
           {r.disabled ? "Disabled" : "Active"}
         </Badge>
       ),
@@ -142,7 +188,7 @@ export default function UsersPage() {
       key: "last",
       header: "Last active",
       cell: (r) => (
-        <span className="text-text-muted whitespace-nowrap">
+        <span className="text-text-muted whitespace-nowrap tabular-nums">
           {r.lastActiveAt ? formatDate(r.lastActiveAt) : "—"}
         </span>
       ),
@@ -152,7 +198,9 @@ export default function UsersPage() {
       header: "Sales",
       align: "right",
       cell: (r) => (
-        <span className="tabular-nums">{r.totalSales}</span>
+        <span className="font-semibold text-text tabular-nums">
+          {r.totalSales}
+        </span>
       ),
     },
     {
@@ -166,7 +214,7 @@ export default function UsersPage() {
             variant="ghost"
             size="sm"
             onClick={() => setResetFor(r)}
-            leftIcon={<Icon name="refresh" size={16} />}
+            leftIcon={<Icon name="rotate-ccw" size={16} />}
           >
             Reset password
           </Button>
@@ -175,6 +223,12 @@ export default function UsersPage() {
             size="sm"
             onClick={() => setConfirmDisable(r)}
             disabled={r.userId === currentUser._id}
+            leftIcon={
+              <Icon
+                name={r.disabled ? "check-circle" : "x-circle"}
+                size={16}
+              />
+            }
           >
             {r.disabled ? "Reactivate" : "Disable"}
           </Button>
@@ -187,11 +241,13 @@ export default function UsersPage() {
     <div>
       <PageHeader
         title="Users"
-        subtitle="Manage cashier and admin accounts."
+        icon="users"
+        subtitle="Manage cashier & admin accounts"
         actions={
           <Button
             onClick={() => setAddOpen(true)}
-            leftIcon={<Icon name="user" size={16} />}
+            className="shadow-primary"
+            leftIcon={<Icon name="plus" size={16} />}
           >
             Add user
           </Button>
@@ -199,14 +255,25 @@ export default function UsersPage() {
       />
 
       {roster === undefined ? (
-        <Card>
-          <div className="p-cell space-y-3">
-            <Skeleton height={40} />
-            <Skeleton height={40} />
+        <Card className="overflow-hidden shadow-sm">
+          <div className="divide-y divide-border" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-cell py-row"
+              >
+                <Skeleton height={36} width={36} rounded />
+                <div className="flex-1 space-y-2">
+                  <Skeleton height={14} width="40%" />
+                  <Skeleton height={12} width="55%" />
+                </div>
+                <Skeleton height={36} width={120} />
+              </div>
+            ))}
           </div>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden shadow-sm">
           <ResponsiveTable<Row>
             caption="User accounts"
             rows={rows}
@@ -214,7 +281,7 @@ export default function UsersPage() {
             columns={columns}
             empty={
               <EmptyState
-                icon="user"
+                icon="users"
                 title="No users yet"
                 description="Add a cashier to get started."
               />

@@ -11,6 +11,7 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   ConfirmDialog,
   Dialog,
   EmptyState,
@@ -20,6 +21,7 @@ import {
   ResponsiveTable,
   Skeleton,
   useToast,
+  cn,
   type Column,
 } from "@/components/ui";
 
@@ -74,14 +76,12 @@ export default function ProductsPage() {
     { initialNumItems: 20 }
   );
 
-  // Bounded full product set for export (no search/category filter — full inventory)
   const { results: exportResults, status: exportStatus } = usePaginatedQuery(
     api.products.list,
     {},
     { initialNumItems: EXPORT_BOUND }
   );
 
-  // Debounce search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -96,15 +96,17 @@ export default function ProductsPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Products" />
+        <PageHeader title="Products" subtitle="Catalog & pricing" icon="tag" />
         <Card className="screen-only">
-          <div className="p-cell space-y-3">
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-          </div>
+          <CardBody>
+            <div className="space-y-3">
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+              <Skeleton height={40} />
+            </div>
+          </CardBody>
         </Card>
       </div>
     );
@@ -113,9 +115,9 @@ export default function ProductsPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <PageHeader title="Products" />
+        <PageHeader title="Products" subtitle="Catalog & pricing" icon="tag" />
         <EmptyState
-          icon="user"
+          icon="shield"
           title="Admins only"
           description="You do not have permission to view this page."
         />
@@ -226,14 +228,15 @@ export default function ProductsPage() {
   const printProducts = exportReady ? (exportResults as ProductDoc[]) : (results as ProductDoc[]);
 
   const rows = results as ProductDoc[];
+  const showingCount = rows.length;
 
   const columns: Column<ProductDoc>[] = [
     {
       key: "photo",
-      header: "Photo",
+      header: <span className="sr-only">Photo</span>,
       hideLabelOnCard: true,
       cell: (product) => (
-        <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-2 flex items-center justify-center flex-shrink-0 text-text-muted">
+        <div className="w-10 h-10 rounded-lg overflow-hidden bg-brand-gradient-soft ring-1 ring-border flex items-center justify-center flex-shrink-0">
           {product.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -242,7 +245,7 @@ export default function ProductsPage() {
               className="w-full h-full object-cover"
             />
           ) : (
-            <Icon name="package" className="w-5 h-5" />
+            <Icon name="package" className="w-5 h-5 text-primary" />
           )}
         </div>
       ),
@@ -251,10 +254,10 @@ export default function ProductsPage() {
       key: "name",
       header: "Name",
       cell: (product) => (
-        <div>
+        <div className="min-w-0">
           <span className="font-medium text-text">{product.name}</span>
           {product.model && (
-            <p className="text-xs text-text-muted mt-0.5">{product.model}</p>
+            <p className="text-xs text-text-muted mt-0.5 truncate">{product.model}</p>
           )}
         </div>
       ),
@@ -276,7 +279,9 @@ export default function ProductsPage() {
     {
       key: "category",
       header: "Category",
-      cell: (product) => <span className="text-text-muted">{product.category}</span>,
+      cell: (product) => (
+        <Badge variant="neutral">{product.category}</Badge>
+      ),
     },
     {
       key: "costPrice",
@@ -300,14 +305,31 @@ export default function ProductsPage() {
       align: "right",
       cell: (product) => {
         const margin = product.sellPrice - product.costPrice;
+        const pct =
+          product.costPrice > 0
+            ? Math.round((margin / product.costPrice) * 100)
+            : null;
         return (
-          <span
-            className={`font-medium tabular-nums ${
-              margin >= 0 ? "text-success-fg" : "text-danger-fg"
-            }`}
-          >
-            {formatPeso(margin)}
-          </span>
+          <div className="flex flex-col items-end leading-tight">
+            <span
+              className={cn(
+                "font-medium tabular-nums",
+                margin >= 0 ? "text-success-fg" : "text-danger-fg"
+              )}
+            >
+              {formatPeso(margin)}
+            </span>
+            {pct !== null && (
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  margin >= 0 ? "text-success-fg/80" : "text-danger-fg/80"
+                )}
+              >
+                {pct}%
+              </span>
+            )}
+          </div>
         );
       },
     },
@@ -316,16 +338,21 @@ export default function ProductsPage() {
       header: "Stock",
       align: "right",
       cell: (product) => {
-        const isLowStock = product.stockQty <= product.reorderThreshold;
+        const isOut = product.stockQty <= 0;
+        const isLow = !isOut && product.stockQty <= product.reorderThreshold;
         return (
-          <span
-            className={`inline-flex items-center gap-1.5 font-medium tabular-nums ${
-              isLowStock ? "text-danger-fg" : "text-text"
-            }`}
-          >
-            {product.stockQty}
-            {isLowStock && <Badge variant="danger">Low</Badge>}
-          </span>
+          <div className="inline-flex items-center gap-1.5 justify-end">
+            <span
+              className={cn(
+                "font-semibold tabular-nums",
+                isOut ? "text-danger-fg" : isLow ? "text-warning-fg" : "text-text"
+              )}
+            >
+              {product.stockQty}
+            </span>
+            {isOut && <Badge variant="danger">Out</Badge>}
+            {isLow && <Badge variant="warning">Low</Badge>}
+          </div>
         );
       },
     },
@@ -378,10 +405,13 @@ export default function ProductsPage() {
     <div>
       <PageHeader
         title="Products"
+        subtitle="Catalog & pricing"
+        icon="tag"
         actions={
-          <div className="flex flex-wrap gap-2 screen-only">
+          <div className="flex flex-wrap items-center gap-2 screen-only">
             <Button
               variant="secondary"
+              size="sm"
               disabled={!exportReady}
               onClick={handleExportCsv}
               leftIcon={<Icon name="download" className="w-4 h-4" />}
@@ -390,6 +420,7 @@ export default function ProductsPage() {
             </Button>
             <Button
               variant="secondary"
+              size="sm"
               disabled={!exportReady}
               onClick={handlePrint}
               leftIcon={<Icon name="printer" className="w-4 h-4" />}
@@ -398,14 +429,16 @@ export default function ProductsPage() {
             </Button>
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => setArchivedOpen(true)}
-              leftIcon={<Icon name="package" className="w-4 h-4" />}
+              leftIcon={<Icon name="box" className="w-4 h-4" />}
             >
-              Archived Products
+              Archived
             </Button>
             <Button
               onClick={openAdd}
               leftIcon={<Icon name="plus" className="w-4 h-4" />}
+              className="shadow-primary"
             >
               Add Product
             </Button>
@@ -413,54 +446,73 @@ export default function ProductsPage() {
         }
       />
 
-      {hitBound && (
-        <div className="mb-4 text-sm text-warning-fg bg-warning-bg border border-warning-fg/20 rounded-md px-3 py-2 screen-only">
-          Showing first {EXPORT_BOUND} products for export. There may be more records not included.
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="flex gap-3 mb-4 flex-wrap screen-only">
-        <Input
-          type="text"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by name..."
-          aria-label="Search products by name"
-          className="w-full sm:w-64"
-        />
-        <Input
-          type="text"
-          value={category ?? ""}
-          onChange={(e) =>
-            setCategory(e.target.value.trim() !== "" ? e.target.value.trim() : undefined)
-          }
-          placeholder="Filter by category..."
-          aria-label="Filter products by category"
-          className="w-full sm:w-48"
-        />
-      </div>
-
-      {/* Printable inventory table */}
       <div className="report-print">
-        <h2 className="text-lg font-bold text-text mb-4 hidden print:block">
-          Inventory Report — {new Date().toLocaleDateString()}
-        </h2>
+        <div className="screen-only">
+          {hitBound && (
+            <div className="mb-3 flex items-start gap-2 text-sm text-warning-fg bg-warning-bg border border-warning-fg/20 rounded-md px-3 py-2">
+              <Icon name="alert-triangle" className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>
+                Showing first {EXPORT_BOUND} products for export. There may be more records not included.
+              </span>
+            </div>
+          )}
 
-        {/* Screen table (paginated with search/category) */}
-        <div className="screen-table">
-          {status === "LoadingFirstPage" ? (
-            <Card>
-              <div className="p-cell space-y-3">
-                <Skeleton height={40} />
-                <Skeleton height={40} />
-                <Skeleton height={40} />
-                <Skeleton height={40} />
-                <Skeleton height={40} />
+          <div className="bg-surface rounded-lg border border-border p-3 shadow-sm mb-4">
+            <div className="flex flex-wrap gap-3 items-center">
+              <div className="relative flex-1 min-w-[12rem]">
+                <Icon
+                  name="search"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+                />
+                <Input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="Search by name..."
+                  aria-label="Search products by name"
+                  className="pl-9"
+                />
               </div>
+              <div className="relative w-full sm:w-48">
+                <Icon
+                  name="tag"
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+                />
+                <Input
+                  type="text"
+                  value={category ?? ""}
+                  onChange={(e) =>
+                    setCategory(e.target.value.trim() !== "" ? e.target.value.trim() : undefined)
+                  }
+                  placeholder="Filter by category..."
+                  aria-label="Filter products by category"
+                  className="pl-9"
+                />
+              </div>
+              <div className="ml-auto text-sm text-text-muted whitespace-nowrap">
+                Showing{" "}
+                <span className="font-semibold text-text tabular-nums">{showingCount}</span>{" "}
+                product{showingCount === 1 ? "" : "s"}
+              </div>
+            </div>
+          </div>
+
+          {status === "LoadingFirstPage" ? (
+            <Card className="overflow-hidden">
+              <CardBody>
+                <div className="space-y-3">
+                  <Skeleton height={44} />
+                  <Skeleton height={44} />
+                  <Skeleton height={44} />
+                  <Skeleton height={44} />
+                  <Skeleton height={44} />
+                </div>
+              </CardBody>
             </Card>
           ) : (
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden shadow-sm">
               <ResponsiveTable<ProductDoc>
                 caption="Product inventory"
                 rows={rows}
@@ -480,6 +532,7 @@ export default function ProductsPage() {
                         <Button
                           onClick={openAdd}
                           leftIcon={<Icon name="plus" className="w-4 h-4" />}
+                          className="shadow-primary"
                         >
                           Add Product
                         </Button>
@@ -505,8 +558,10 @@ export default function ProductsPage() {
           )}
         </div>
 
-        {/* Print-only full inventory table */}
         <div className="hidden print:block mt-4">
+          <h2 className="text-lg font-bold text-text mb-4">
+            Inventory Report — {new Date().toLocaleDateString()}
+          </h2>
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="border-b-2 border-text">
@@ -585,7 +640,7 @@ export default function ProductsPage() {
           </div>
         ) : (archivedResults as ProductDoc[]).length === 0 ? (
           <EmptyState
-            icon="package"
+            icon="box"
             title="No archived products"
             description="Products you archive will appear here."
           />
@@ -597,7 +652,7 @@ export default function ProductsPage() {
                   key={product._id}
                   className="flex items-center gap-3 py-row"
                 >
-                  <div className="w-10 h-10 rounded-md overflow-hidden bg-surface-2 flex items-center justify-center flex-shrink-0 text-text-muted">
+                  <div className="w-10 h-10 rounded-lg overflow-hidden bg-brand-gradient-soft ring-1 ring-border flex items-center justify-center flex-shrink-0">
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -606,7 +661,7 @@ export default function ProductsPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <Icon name="package" className="w-5 h-5" />
+                      <Icon name="package" className="w-5 h-5 text-primary" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">

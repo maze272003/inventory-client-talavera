@@ -9,6 +9,7 @@ import {
   Badge,
   Button,
   Card,
+  CardBody,
   ConfirmDialog,
   EmptyState,
   Icon,
@@ -111,14 +112,25 @@ export default function AuditLogPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Audit Log" />
-        <Card>
-          <div className="p-cell space-y-3">
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
+        <PageHeader
+          title="Audit Log"
+          icon="history"
+          subtitle="Newest-first change history. Only the latest undoable change can be reverted."
+        />
+        <Card className="overflow-hidden shadow-sm">
+          <div className="divide-y divide-border" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-cell py-row"
+              >
+                <Skeleton height={14} width="18%" />
+                <Skeleton height={14} width="22%" />
+                <Skeleton height={18} width="14%" rounded />
+                <div className="flex-1" />
+                <Skeleton height={14} width="20%" />
+              </div>
+            ))}
           </div>
         </Card>
       </div>
@@ -128,9 +140,13 @@ export default function AuditLogPage() {
   if (!isAdmin) {
     return (
       <div>
-        <PageHeader title="Audit Log" />
+        <PageHeader
+          title="Audit Log"
+          icon="history"
+          subtitle="Newest-first change history. Only the latest undoable change can be reverted."
+        />
         <EmptyState
-          icon="user"
+          icon="shield"
           title="Admins only"
           description="You do not have permission to view this page."
         />
@@ -138,7 +154,6 @@ export default function AuditLogPage() {
     );
   }
 
-  // The single most-recent non-reverted entry that can be undone.
   const undoableEntryId =
     latest && latest.undoable && !latest.reverted ? latest._id : null;
 
@@ -175,10 +190,12 @@ export default function AuditLogPage() {
       key: "user",
       header: "User",
       cell: (entry) => (
-        <div>
-          <div className="text-text">{entry.userName}</div>
+        <div className="min-w-0">
+          <div className="text-text truncate">{entry.userName}</div>
           {entry.userEmail && (
-            <div className="text-text-muted text-xs">{entry.userEmail}</div>
+            <div className="text-text-muted text-xs truncate">
+              {entry.userEmail}
+            </div>
           )}
         </div>
       ),
@@ -204,7 +221,9 @@ export default function AuditLogPage() {
     {
       key: "summary",
       header: "Summary",
-      cell: (entry) => <span className="text-text">{entry.summary}</span>,
+      cell: (entry) => (
+        <span className="text-text">{entry.summary}</span>
+      ),
     },
     {
       key: "status",
@@ -214,12 +233,18 @@ export default function AuditLogPage() {
         const canUndo = entry._id === undoableEntryId;
         return (
           <div className="flex items-center justify-end gap-2">
-            {entry.reverted && <Badge variant="neutral">Reverted</Badge>}
+            {entry.reverted && (
+              <Badge variant="neutral">
+                <Icon name="rotate-ccw" size={12} />
+                Reverted
+              </Badge>
+            )}
             {canUndo && (
               <Button
                 variant="secondary"
+                size="sm"
                 onClick={() => setConfirmOpen(true)}
-                leftIcon={<Icon name="refresh" size={16} />}
+                leftIcon={<Icon name="rotate-ccw" size={16} />}
               >
                 Undo
               </Button>
@@ -234,71 +259,87 @@ export default function AuditLogPage() {
     <div>
       <PageHeader
         title="Audit Log"
-        subtitle="A newest-first history of data changes. Only the most recent undoable change can be reverted."
+        icon="history"
+        subtitle="Newest-first change history. Only the latest undoable change can be reverted."
       />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Select
-          value={filterUserId}
-          onChange={(e) => setFilterUserId(e.target.value as Id<"users"> | "")}
-          className="w-48"
-        >
-          <option value="">All users</option>
-          {(roster ?? []).map((u) => (
-            <option key={u.userId} value={u.userId}>
-              {u.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={filterAction}
-          onChange={(e) => setFilterAction(e.target.value)}
-          className="w-48"
-        >
-          <option value="">All actions</option>
-          {(
-            [
-              "create",
-              "update",
-              "archive",
-              "restore",
-              "sale",
-              "stock_in",
-              "adjustment",
-              "password_reset",
-            ] as AuditAction[]
-          ).map((a) => (
-            <option key={a} value={a}>
-              {actionLabel(a)}
-            </option>
-          ))}
-        </Select>
-        <Select
-          value={filterEntity}
-          onChange={(e) => setFilterEntity(e.target.value)}
-          className="w-48"
-        >
-          <option value="">All entities</option>
-          {["products", "purchases", "sales", "users"].map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </Select>
-      </div>
+      <Card className="mb-4 shadow-sm">
+        <CardBody className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-text-muted mr-1">
+            <Icon name="filter" size={16} />
+            <span className="hidden sm:inline">Filter</span>
+          </span>
+          <Select
+            value={filterUserId}
+            onChange={(e) =>
+              setFilterUserId(e.target.value as Id<"users"> | "")
+            }
+            className="w-48"
+          >
+            <option value="">All users</option>
+            {(roster ?? []).map((u) => (
+              <option key={u.userId} value={u.userId}>
+                {u.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={filterAction}
+            onChange={(e) => setFilterAction(e.target.value)}
+            className="w-44"
+          >
+            <option value="">All actions</option>
+            {(
+              [
+                "create",
+                "update",
+                "archive",
+                "restore",
+                "sale",
+                "stock_in",
+                "adjustment",
+                "password_reset",
+              ] as AuditAction[]
+            ).map((a) => (
+              <option key={a} value={a}>
+                {actionLabel(a)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            value={filterEntity}
+            onChange={(e) => setFilterEntity(e.target.value)}
+            className="w-44"
+          >
+            <option value="">All entities</option>
+            {["products", "purchases", "sales", "users"].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+        </CardBody>
+      </Card>
 
       {status === "LoadingFirstPage" ? (
-        <Card>
-          <div className="p-cell space-y-3">
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
-            <Skeleton height={40} />
+        <Card className="overflow-hidden shadow-sm">
+          <div className="divide-y divide-border" aria-busy="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 px-cell py-row"
+              >
+                <Skeleton height={14} width="18%" />
+                <Skeleton height={14} width="22%" />
+                <Skeleton height={18} width="14%" rounded />
+                <div className="flex-1" />
+                <Skeleton height={14} width="20%" />
+              </div>
+            ))}
           </div>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden shadow-sm">
           <ResponsiveTable<AuditEntry>
             caption="Audit log entries"
             rows={rows}
@@ -306,7 +347,7 @@ export default function AuditLogPage() {
             columns={columns}
             empty={
               <EmptyState
-                icon="refresh"
+                icon="history"
                 title="No audit entries yet"
                 description="Data changes will be recorded here as they happen."
               />
@@ -315,14 +356,22 @@ export default function AuditLogPage() {
 
           {status === "CanLoadMore" && (
             <div className="flex justify-center py-row border-t border-border">
-              <Button variant="ghost" onClick={() => loadMore(20)}>
+              <Button
+                variant="ghost"
+                onClick={() => loadMore(20)}
+                leftIcon={<Icon name="chevron-down" size={16} />}
+              >
                 Load more
               </Button>
             </div>
           )}
           {status === "LoadingMore" && (
-            <div className="flex justify-center py-row border-t border-border">
-              <Skeleton height={20} width={120} />
+            <div
+              className="flex justify-center py-row border-t border-border"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <Skeleton height={16} width={140} />
             </div>
           )}
         </Card>

@@ -58,6 +58,9 @@ export type { EmptyStateProps } from "./EmptyState";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 
+export { StatCard } from "./StatCard";
+export type { StatCardProps, StatTone } from "./StatCard";
+
 export { SegmentedControl } from "./SegmentedControl";
 export type { SegmentedControlProps, SegmentedOption } from "./SegmentedControl";
 

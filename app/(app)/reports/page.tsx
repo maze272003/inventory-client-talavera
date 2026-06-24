@@ -17,6 +17,7 @@ import {
   ResponsiveTable,
   SegmentedControl,
   Skeleton,
+  StatCard,
   useToast,
 } from "@/components/ui";
 
@@ -57,29 +58,6 @@ function presetRange(preset: Preset): { startMs: number; endMs: number } {
   const start = new Date(now);
   start.setDate(now.getDate() - 29);
   return { startMs: startOfDay(start).getTime(), endMs: endOfDay(now).getTime() };
-}
-
-interface SummaryCardProps {
-  label: string;
-  value: string;
-  loading?: boolean;
-}
-
-function SummaryCard({ label, value, loading }: SummaryCardProps) {
-  return (
-    <Card>
-      <CardBody className="flex flex-col gap-1">
-        <span className="text-xs font-semibold uppercase tracking-widest text-text-muted">
-          {label}
-        </span>
-        {loading ? (
-          <Skeleton height={32} width="70%" />
-        ) : (
-          <span className="text-2xl font-bold text-text figure-nums">{value}</span>
-        )}
-      </CardBody>
-    </Card>
-  );
 }
 
 export default function ReportsPage() {
@@ -124,16 +102,12 @@ export default function ReportsPage() {
   if (currentUser === undefined) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Reports" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardBody className="flex flex-col gap-2">
-                <Skeleton height={12} width="50%" />
-                <Skeleton height={32} width="70%" />
-              </CardBody>
-            </Card>
-          ))}
+        <PageHeader title="Reports" icon="bar-chart" subtitle="Sales performance & insights" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="Revenue" value="" icon="dollar-sign" tone="success" loading />
+          <StatCard label="Profit" value="" icon="trending-up" tone="primary" loading />
+          <StatCard label="Units Sold" value="" icon="package" tone="info" loading />
+          <StatCard label="Transactions" value="" icon="receipt" tone="warning" loading />
         </div>
       </div>
     );
@@ -142,7 +116,7 @@ export default function ReportsPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div className="space-y-6">
-        <PageHeader title="Reports" />
+        <PageHeader title="Reports" icon="bar-chart" subtitle="Sales performance & insights" />
         <EmptyState
           icon="info"
           title="Admins only"
@@ -226,11 +200,21 @@ export default function ReportsPage() {
   }
 
   const summaryLoading = summary === undefined;
+  const rangeDisplay =
+    preset === "custom"
+      ? `${customFrom} to ${customTo}`
+      : preset === "daily"
+      ? `Today (${today})`
+      : preset === "weekly"
+      ? "Last 7 days"
+      : "Last 30 days";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Reports"
+        icon="bar-chart"
+        subtitle="Sales performance & insights"
         actions={
           <div className="flex gap-2 screen-only">
             <Button
@@ -254,80 +238,87 @@ export default function ReportsPage() {
         }
       />
 
-      {/* Preset toggle */}
-      <div className="screen-only">
+      <div className="screen-only space-y-3">
         <SegmentedControl<Preset>
           ariaLabel="Report date range"
           value={preset}
           onChange={setPreset}
           options={presets}
         />
+        {preset === "custom" && (
+          <Card>
+            <CardBody>
+              <DateRangePicker
+                from={customFrom}
+                to={customTo}
+                onFromChange={setCustomFrom}
+                onToChange={(v) => {
+                  setCustomTo(v);
+                }}
+              />
+              {!customRangeReady && (
+                <p className="mt-3 text-xs text-warning-fg">
+                  Select both a start and end date to view the report.
+                </p>
+              )}
+            </CardBody>
+          </Card>
+        )}
       </div>
 
-      {/* Custom date range picker */}
-      {preset === "custom" && (
-        <Card className="screen-only">
-          <CardBody>
-            <DateRangePicker
-              from={customFrom}
-              to={customTo}
-              onFromChange={setCustomFrom}
-              onToChange={(v) => {
-                setCustomTo(v);
-              }}
-            />
-            {!customRangeReady && (
-              <p className="mt-3 text-xs text-warning-fg">
-                Select both a start and end date to view the report.
-              </p>
-            )}
-          </CardBody>
-        </Card>
-      )}
-
-      {/* Printable report container */}
       <div className="report-print space-y-6">
-        {/* Range label */}
         {(preset !== "custom" || customRangeReady) && (
-          <p className="text-xs text-text-muted">
-            {preset === "custom"
-              ? `${customFrom} to ${customTo}`
-              : preset === "daily"
-              ? `Today (${today})`
-              : preset === "weekly"
-              ? "Last 7 days"
-              : "Last 30 days"}
-          </p>
+          <div className="flex items-center gap-2 text-sm text-text-muted">
+            <Icon name="calendar" size={15} className="text-text-subtle" />
+            <span className="font-medium tabular-nums">{rangeDisplay}</span>
+          </div>
         )}
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
             label="Revenue"
             loading={summaryLoading}
             value={summary ? formatPeso(summary.revenue) : "—"}
+            icon="dollar-sign"
+            tone="success"
           />
-          <SummaryCard
+          <StatCard
             label="Profit"
             loading={summaryLoading}
             value={summary ? formatPeso(summary.profit) : "—"}
+            icon="trending-up"
+            tone="primary"
           />
-          <SummaryCard
+          <StatCard
             label="Units Sold"
             loading={summaryLoading}
             value={summary ? String(summary.unitsSold) : "—"}
+            icon="package"
+            tone="info"
           />
-          <SummaryCard
+          <StatCard
             label="Transactions"
             loading={summaryLoading}
             value={summary ? String(summary.saleCount) : "—"}
+            icon="receipt"
+            tone="warning"
           />
         </div>
 
-        {/* Top products table */}
         <Card>
           <CardHeader>
-            <h2 className="text-base font-semibold text-text">Top Products</h2>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Icon name="package" size={16} />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-text">Top Products</h2>
+                <p className="text-xs text-text-muted">Ranked by revenue</p>
+              </div>
+            </div>
+            <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-text-muted tabular-nums">
+              {topProducts?.length ?? 0} items
+            </span>
           </CardHeader>
           <CardBody>
             {topProducts === undefined ? (
@@ -346,7 +337,7 @@ export default function ReportsPage() {
                     key: "rank",
                     header: "#",
                     align: "left",
-                    className: "text-text-muted tabular-nums",
+                    className: "text-text-subtle tabular-nums",
                     cell: (_p, i) => i + 1,
                   },
                   {
@@ -383,10 +374,20 @@ export default function ReportsPage() {
           </CardBody>
         </Card>
 
-        {/* Cashier Performance table */}
         <Card>
           <CardHeader>
-            <h2 className="text-base font-semibold text-text">Cashier Performance</h2>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-info-bg text-info">
+                <Icon name="users" size={16} />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-text">Cashier Performance</h2>
+                <p className="text-xs text-text-muted">Sales by staff member</p>
+              </div>
+            </div>
+            <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-medium text-text-muted tabular-nums">
+              {cashierRows?.length ?? 0} cashiers
+            </span>
           </CardHeader>
           <CardBody>
             {cashierRows === undefined ? (

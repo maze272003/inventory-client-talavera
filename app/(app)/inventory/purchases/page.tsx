@@ -290,8 +290,8 @@ export default function PurchasesPage() {
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Purchases" />
-        <Card className="mt-6">
+        <PageHeader title="Purchases" icon="truck" />
+        <Card>
           <PurchasesSkeleton />
         </Card>
       </div>
@@ -301,8 +301,8 @@ export default function PurchasesPage() {
   if (currentUser?.role !== "admin") {
     return (
       <div>
-        <PageHeader title="Purchases" />
-        <Card className="mt-6">
+        <PageHeader title="Purchases" icon="truck" />
+        <Card>
           <EmptyState
             icon="alert-triangle"
             title="Admins only"
@@ -319,6 +319,7 @@ export default function PurchasesPage() {
     <div>
       <PageHeader
         title="Purchases"
+        icon="truck"
         subtitle={
           !isFirstLoad
             ? `${results.length} purchase${results.length === 1 ? "" : "s"}`
@@ -327,7 +328,8 @@ export default function PurchasesPage() {
         actions={
           <Button
             variant="secondary"
-            leftIcon={<Icon name="receipt" size={16} />}
+            size="sm"
+            leftIcon={<Icon name="box" size={16} />}
             onClick={() => setArchivedOpen(true)}
           >
             Archived purchases
@@ -335,7 +337,7 @@ export default function PurchasesPage() {
         }
       />
 
-      <Card className="mt-6 overflow-hidden">
+      <Card className="overflow-hidden">
         {isFirstLoad ? (
           <PurchasesSkeleton />
         ) : results.length === 0 ? (
