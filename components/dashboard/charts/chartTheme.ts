@@ -52,3 +52,21 @@ export function useChartColors(): ChartColors {
   }, []);
   return colors;
 }
+
+/**
+ * Shared Recharts tooltip contentStyle — shadcn popover look, theme-aware.
+ * Replaces the per-chart duplicated inline objects.
+ */
+export function chartTooltipStyle(
+  c: ChartColors,
+): Record<string, string | number> {
+  return {
+    background: c.surface,
+    border: `1px solid ${c.border}`,
+    borderRadius: 8,
+    color: c.text,
+    fontSize: 12,
+    boxShadow:
+      "0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05)",
+  };
+}

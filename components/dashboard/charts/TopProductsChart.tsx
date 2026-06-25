@@ -1,10 +1,9 @@
 "use client";
 
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
 import { formatPeso } from "@/lib/format";
-import { useChartColors } from "./chartTheme";
+import { useChartColors, chartTooltipStyle } from "./chartTheme";
+import { ChartContainer } from "./Chart";
 
 export type TopProduct = { name: string; units: number; revenue: number };
 export type TopMetric = "units" | "revenue";
@@ -27,7 +26,7 @@ export default function TopProductsChart({
             type="button"
             onClick={() => onMetricChange(m)}
             className={`rounded-md px-2 py-1 text-xs font-medium capitalize transition-colors ${
-              metric === m ? "bg-primary text-primary-fg" : "text-text-muted hover:bg-surface-2"
+              metric === m ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
             }`}
           >
             {m}
@@ -35,18 +34,15 @@ export default function TopProductsChart({
         ))}
       </div>
       <div className="min-h-0 flex-1">
-        <ResponsiveContainer width="100%" height="100%">
+        <ChartContainer>
           <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, bottom: 0, left: 8 }}>
             <CartesianGrid stroke={c.border} strokeDasharray="3 3" horizontal={false} />
             <XAxis type="number" stroke={c.textMuted} fontSize={12} tickLine={false} tickFormatter={fmt} />
             <YAxis type="category" dataKey="name" stroke={c.textMuted} fontSize={12} tickLine={false} width={110} />
-            <Tooltip
-              formatter={(v) => [fmt(Number(v ?? 0)), metric === "revenue" ? "Revenue" : "Units"]}
-              contentStyle={{ background: c.surface, border: `1px solid ${c.border}`, borderRadius: 8, color: c.text, fontSize: 12 }}
-            />
+            <Tooltip formatter={(v) => [fmt(Number(v ?? 0)), metric === "revenue" ? "Revenue" : "Units"]} contentStyle={chartTooltipStyle(c)} />
             <Bar dataKey={metric} fill={c.primary} radius={[0, 3, 3, 0]} />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </div>
     </div>
   );
