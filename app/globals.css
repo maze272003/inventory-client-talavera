@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* Class-based dark mode (manual toggle), not prefers-color-scheme.
    Tailwind v4: register the dark variant against the .dark class. */
@@ -224,6 +225,33 @@ html.dark {
 
   --animate-ease-standard: var(--ease-standard);
   --animate-ease-spring: var(--ease-spring);
+
+  /* ── shadcn/ui token aliases — map shadcn's standard names onto the
+     existing --color-* raw vars. Because those raw vars already flip in
+     html.dark, shadcn components inherit light/dark automatically. ── */
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-text);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text);
+  --color-primary-foreground: var(--color-primary-fg);
+  --color-secondary: var(--color-surface-2);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted: var(--color-surface-2);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent: var(--color-surface-2);
+  --color-accent-foreground: var(--color-text);
+  --color-destructive: var(--color-danger);
+  --color-destructive-foreground: var(--color-danger-fg);
+  --color-input: var(--color-border);
+
+  /* Chart series — reuse semantic tokens so charts also follow dark mode. */
+  --color-chart-1: var(--color-primary);
+  --color-chart-2: var(--color-success);
+  --color-chart-3: var(--color-warning);
+  --color-chart-4: var(--color-info);
+  --color-chart-5: var(--color-danger);
 }
 
 body {
