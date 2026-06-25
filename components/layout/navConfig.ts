@@ -30,18 +30,6 @@ export const NAV_GROUPS: NavGroup[] = [
     links: [
       { href: "/products", label: "Products", icon: "tag", adminOnly: true },
       { href: "/inventory", label: "Inventory", icon: "boxes", adminOnly: true },
-      {
-        href: "/inventory/import",
-        label: "Import Invoice",
-        icon: "upload",
-        adminOnly: true,
-      },
-      {
-        href: "/inventory/purchases",
-        label: "Purchases",
-        icon: "truck",
-        adminOnly: true,
-      },
     ],
   },
   {
