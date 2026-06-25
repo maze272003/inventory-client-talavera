@@ -64,11 +64,15 @@ export function Field({
       )}
       {control}
       {error ? (
-        <p id={errorId} className="text-xs text-danger" role="alert">
+        <p
+          id={errorId}
+          role="alert"
+          className="text-xs font-medium text-destructive"
+        >
           {error}
         </p>
       ) : hint ? (
-        <p id={hintId} className="text-xs text-text-muted">
+        <p id={hintId} className="text-xs text-muted-foreground">
           {hint}
         </p>
       ) : null}
