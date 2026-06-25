@@ -314,7 +314,7 @@ export default function ProductsPage() {
             <span
               className={cn(
                 "font-medium tabular-nums",
-                margin >= 0 ? "text-success-fg" : "text-danger-fg"
+                margin >= 0 ? "text-success" : "text-danger"
               )}
             >
               {formatPeso(margin)}
@@ -323,7 +323,7 @@ export default function ProductsPage() {
               <span
                 className={cn(
                   "text-xs tabular-nums",
-                  margin >= 0 ? "text-success-fg/80" : "text-danger-fg/80"
+                  margin >= 0 ? "text-success/80" : "text-danger/80"
                 )}
               >
                 {pct}%
@@ -345,7 +345,7 @@ export default function ProductsPage() {
             <span
               className={cn(
                 "font-semibold tabular-nums",
-                isOut ? "text-danger-fg" : isLow ? "text-warning-fg" : "text-text"
+                 isOut ? "text-danger" : isLow ? "text-warning" : "text-text"
               )}
             >
               {product.stockQty}

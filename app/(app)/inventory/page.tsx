@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
 import { useQuery, usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import StockInDialog from "@/components/StockInDialog";
 import AdjustDialog from "@/components/AdjustDialog";
 import LedgerDrawer from "@/components/LedgerDrawer";
+import { ImportInvoiceModal } from "@/components/inventory/ImportInvoiceModal";
+import { PurchasesModal } from "@/components/inventory/PurchasesModal";
 import {
   PageHeader,
   Card,
@@ -160,7 +161,7 @@ function ProductPickerAndActions() {
                       <span
                         className={cn(
                           "font-semibold tabular-nums",
-                          isOut ? "text-danger-fg" : isLow ? "text-warning-fg" : "text-text"
+                          isOut ? "text-danger" : isLow ? "text-warning" : "text-text"
                         )}
                       >
                         {p.stockQty}
@@ -261,7 +262,7 @@ function ProductPickerAndActions() {
   );
 }
 
-function LowStockSection() {
+function LowStockSection({ onOpenImport }: { onOpenImport: () => void }) {
   const lowStock = useQuery(api.products.lowStock, {});
 
   if (lowStock === undefined) {
@@ -299,13 +300,14 @@ function LowStockSection() {
               {lowStock.length}
             </Badge>
           </div>
-          <Link
-            href="/inventory/import"
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-border bg-surface px-3 text-sm font-medium text-text shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<Icon name="truck" size={16} />}
+            onClick={onOpenImport}
           >
-            <Icon name="truck" size={16} />
             <span className="hidden sm:inline">Restock</span>
-          </Link>
+          </Button>
         </CardHeader>
         <CardBody>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -357,11 +359,40 @@ function LowStockSection() {
 
 export default function InventoryPage() {
   const currentUser = useQuery(api.users.currentUser);
+  const [modal, setModal] = useState<"import" | "purchases" | null>(null);
+
+  const headerActions = (
+    <>
+      <Button
+        variant="secondary"
+        size="sm"
+        leftIcon={<Icon name="upload" size={16} />}
+        onClick={() => setModal("import")}
+      >
+        <span className="hidden sm:inline">Import Invoice</span>
+        <span className="sm:hidden">Import</span>
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        leftIcon={<Icon name="truck" size={16} />}
+        onClick={() => setModal("purchases")}
+      >
+        <span className="hidden sm:inline">Purchases</span>
+        <span className="sm:hidden">History</span>
+      </Button>
+    </>
+  );
 
   if (currentUser === undefined) {
     return (
       <div>
-        <PageHeader title="Inventory" subtitle="Stock levels & movements" icon="boxes" />
+        <PageHeader
+          title="Inventory"
+          subtitle="Stock levels & movements"
+          icon="boxes"
+          actions={headerActions}
+        />
         <div className="space-y-6">
           <Card>
             <CardBody>
@@ -393,9 +424,24 @@ export default function InventoryPage() {
 
   return (
     <div>
-      <PageHeader title="Inventory" subtitle="Stock levels & movements" icon="boxes" />
-      <LowStockSection />
+      <PageHeader
+        title="Inventory"
+        subtitle="Stock levels & movements"
+        icon="boxes"
+        actions={headerActions}
+      />
+      <LowStockSection onOpenImport={() => setModal("import")} />
       <ProductPickerAndActions />
+
+      <ImportInvoiceModal
+        open={modal === "import"}
+        onClose={() => setModal(null)}
+        onViewPurchases={() => setModal("purchases")}
+      />
+      <PurchasesModal
+        open={modal === "purchases"}
+        onClose={() => setModal(null)}
+      />
     </div>
   );
 }
