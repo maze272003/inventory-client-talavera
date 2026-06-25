@@ -76,7 +76,7 @@ export function AlertDialogTitle({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Title>) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("text-lg font-semibold text-text", className)}
+      className={cn("text-lg font-semibold text-foreground", className)}
       {...props}
     />
   );

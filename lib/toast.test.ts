@@ -24,6 +24,10 @@ describe("toToastArgs", () => {
     expect(toToastArgs({ title: "a", duration: 6000 }).data.duration).toBe(6000);
   });
 
+  it("treats a negative duration as sticky (Infinity)", () => {
+    expect(toToastArgs({ title: "a", duration: -1 }).data.duration).toBe(Infinity);
+  });
+
   it("falls back to an empty message when title is absent", () => {
     expect(toToastArgs({ description: "only desc" }).message).toBe("");
   });
