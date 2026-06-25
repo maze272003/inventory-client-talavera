@@ -7,6 +7,7 @@ export const ledgerTypeValidator = v.union(
   v.literal("sale"),
   v.literal("stock_in"),
   v.literal("adjustment"),
+  v.literal("return"),
 );
 
 export const batchSourceValidator = v.union(
@@ -64,12 +65,14 @@ export default defineSchema({
     saleId: v.optional(v.id("sales")),
     purchaseId: v.optional(v.id("purchases")),
     batchId: v.optional(v.id("batches")),
+    returnId: v.optional(v.id("returns")),
     userId: v.id("users"),
   })
     .index("by_product", ["productId"])
     .index("by_type", ["type"])
     .index("by_purchase", ["purchaseId"])
-    .index("by_batch", ["batchId"]),
+    .index("by_batch", ["batchId"])
+    .index("by_return", ["returnId"]),
 
   sales: defineTable({
     receiptNumber: v.number(),
@@ -162,6 +165,7 @@ export default defineSchema({
       v.literal("stock_in"),
       v.literal("adjustment"),
       v.literal("password_reset"),
+      v.literal("return"),
     ),
     summary: v.string(),
     before: v.optional(v.any()),
@@ -174,4 +178,35 @@ export default defineSchema({
   })
     .index("by_reverted", ["reverted"])
     .index("by_userId", ["userId"]),
+
+  returns: defineTable({
+    saleId: v.id("sales"),
+    receiptNumber: v.number(),
+    totalRefund: v.number(),
+    itemCount: v.number(),
+    cashRefunded: v.number(),
+    processedBy: v.id("users"),
+    reason: v.optional(v.string()),
+  })
+    .index("by_sale", ["saleId"])
+    .index("by_processedBy", ["processedBy"]),
+
+  returnItems: defineTable({
+    returnId: v.id("returns"),
+    saleId: v.id("sales"),
+    saleItemId: v.id("saleItems"),
+    productId: v.id("products"),
+    batchId: v.id("batches"),
+    batchNumberSnapshot: v.string(),
+    nameSnapshot: v.string(),
+    skuSnapshot: v.string(),
+    unitSellPrice: v.number(),
+    unitCostPrice: v.number(),
+    quantity: v.number(),
+    lineRefund: v.number(),
+  })
+    .index("by_return", ["returnId"])
+    .index("by_saleItem", ["saleItemId"])
+    .index("by_sale", ["saleId"])
+    .index("by_product", ["productId"]),
 });

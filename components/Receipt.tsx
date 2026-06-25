@@ -6,6 +6,8 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso, formatDate } from "@/lib/format";
 import { Button, Skeleton, Icon } from "@/components/ui";
+import ReturnDialog from "@/components/returns/ReturnDialog";
+import ReturnsHistory from "@/components/returns/ReturnsHistory";
 
 type Props = {
   saleId: Id<"sales">;
@@ -13,8 +15,11 @@ type Props = {
 
 export default function Receipt({ saleId }: Props) {
   const [is58mm, setIs58mm] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   const data = useQuery(api.sales.getSale, { saleId });
+  const currentUser = useQuery(api.users.currentUser);
+  const isAdmin = currentUser?.role === "admin";
 
   if (data === undefined) {
     return (
@@ -65,6 +70,15 @@ export default function Receipt({ saleId }: Props) {
         <Button variant="secondary" onClick={() => setIs58mm((v) => !v)}>
           {is58mm ? "Switch to 80mm" : "Switch to 58mm"}
         </Button>
+        {isAdmin && sale.isArchived !== true && (
+          <Button
+            variant="danger"
+            onClick={() => setReturnOpen(true)}
+            leftIcon={<Icon name="rotate-ccw" size={18} />}
+          >
+            Return Items
+          </Button>
+        )}
       </div>
 
       {/* Receipt content — keep print classes (receipt-print / receipt-58 / screen-only) */}
@@ -175,6 +189,21 @@ export default function Receipt({ saleId }: Props) {
           <p>Thank you for your purchase!</p>
         </div>
       </div>
+
+      {/* Returns history (admin-only, hidden on print) */}
+      {isAdmin && (
+        <div className="print:hidden">
+          <ReturnsHistory saleId={saleId} />
+        </div>
+      )}
+
+      {isAdmin && (
+        <ReturnDialog
+          saleId={saleId}
+          open={returnOpen}
+          onClose={() => setReturnOpen(false)}
+        />
+      )}
     </div>
   );
 }

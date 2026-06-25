@@ -8,6 +8,7 @@ import {
   bucketLabel,
   type Granularity,
 } from "./lib/buckets";
+import { loadReturnsInPeriod } from "./lib/returns";
 
 export const salesSummary = query({
   args: { startMs: v.number(), endMs: v.number() },
@@ -31,7 +32,24 @@ export const salesSummary = query({
         unitsSold += it.quantity;
       }
     }
-    return { revenue, profit, unitsSold, saleCount: sales.length };
+    // Net out returns whose _creationTime falls in the same window. A sale plus
+    // a same-period full return nets to 0 revenue/profit/unitsSold, but
+    // saleCount is NOT decremented (the sale still happened).
+    const returnsData = await loadReturnsInPeriod(ctx, args.startMs, args.endMs);
+    revenue -= returnsData.totals.refundTotal;
+    // costTotal is the COGS of returned items. The profit impact of a return is
+    // its LINE profit (refund minus restored COGS): both the revenue and the
+    // COGS reverse, so net profit drops by (refund - cost). Subtracting just
+    // costTotal would double-count and drive a full return's profit negative.
+    profit -= returnsData.totals.refundTotal - returnsData.totals.costTotal;
+    unitsSold -= returnsData.totals.itemCount;
+    return {
+      revenue,
+      profit,
+      unitsSold,
+      saleCount: sales.length,
+      truncated: returnsData.truncated,
+    };
   },
 });
 
@@ -57,6 +75,16 @@ export const topProducts = query({
         cur.unitsSold += it.quantity;
         cur.revenue += it.lineTotal;
         agg.set(key, cur);
+      }
+    }
+    // Subtract returned units/revenue per product BEFORE ranking so products
+    // whose net units fall to 0 simply drop down the order.
+    const returnsData = await loadReturnsInPeriod(ctx, args.startMs, args.endMs);
+    for (const [productId, r] of returnsData.totals.byProduct) {
+      const cur = agg.get(productId);
+      if (cur) {
+        cur.unitsSold -= r.qty;
+        cur.revenue -= r.refund;
       }
     }
     return [...agg.values()].sort((a, b) => b.unitsSold - a.unitsSold).slice(0, args.limit);
@@ -93,6 +121,20 @@ export const cashierPerformance = query({
       agg.set(sale.cashierId, cur);
     }
 
+    // Charge returns to the ORIGINAL sale's cashier (loadReturnsInPeriod joins
+    // via sales.cashierId), NOT the admin who processed the return.
+    const returnsData = await loadReturnsInPeriod(ctx, args.startMs, args.endMs);
+    for (const [cashierId, r] of returnsData.totals.byCashier) {
+      const cur = agg.get(cashierId);
+      if (cur) {
+        cur.revenue -= r.refund;
+        // See salesSummary: the profit impact is the returned line profit
+        // (refund - restored COGS), not the bare COGS.
+        cur.profit -= r.refund - r.cost;
+        cur.units -= r.qty;
+      }
+    }
+
     const rows = await Promise.all(
       [...agg.values()].map(async (a) => {
         const profile = await ctx.db
@@ -118,8 +160,9 @@ const granularityValidator = v.union(
 
 type RangeTotals = { revenue: number; profit: number; units: number; transactions: number };
 
-// Totals only (used for the previous-period growth deltas).
-async function rangeTotals(
+// Gross totals only (used as the baseline for the previous-period growth
+// deltas). Net callers should use `rangeNetTotals`, which subtracts returns.
+async function rangeGrossTotals(
   ctx: QueryCtx,
   startMs: number,
   endMs: number,
@@ -148,6 +191,24 @@ async function rangeTotals(
   return { revenue, profit, units, transactions };
 }
 
+// Gross totals net-of-returns for the same window. `transactions` is left
+// unchanged (a sale still happened even if fully returned in the same window).
+async function rangeNetTotals(
+  ctx: QueryCtx,
+  startMs: number,
+  endMs: number,
+): Promise<RangeTotals> {
+  const gross = await rangeGrossTotals(ctx, startMs, endMs);
+  const returnsData = await loadReturnsInPeriod(ctx, startMs, endMs);
+  return {
+    revenue: gross.revenue - returnsData.totals.refundTotal,
+    // Line profit of returned items = refund - restored COGS (see salesSummary).
+    profit: gross.profit - (returnsData.totals.refundTotal - returnsData.totals.costTotal),
+    units: gross.units - returnsData.totals.itemCount,
+    transactions: gross.transactions,
+  };
+}
+
 export const dashboardAnalytics = query({
   args: {
     startMs: v.number(),
@@ -166,8 +227,8 @@ export const dashboardAnalytics = query({
         q.gte("_creationTime", args.startMs).lte("_creationTime", args.endMs),
       )
       .take(MAX_SALES + 1);
-    const truncated = raw.length > MAX_SALES;
-    const sales = truncated ? raw.slice(0, MAX_SALES) : raw;
+    const salesTruncated = raw.length > MAX_SALES;
+    const sales = salesTruncated ? raw.slice(0, MAX_SALES) : raw;
 
     type Bucket = {
       bucketStart: number; label: string;
@@ -221,10 +282,33 @@ export const dashboardAnalytics = query({
       }
     }
 
+    // Net out returns. Per-bucket revenue attribution is by the RETURN's
+    // _creationTime (option (a) in the change spec): since loadReturnsInPeriod
+    // aggregates and loses per-return timestamps, do a separate bounded raw
+    // scan for bucket placement. KPI totals come from loadReturnsInPeriod so
+    // profit/units are netted too.
+    const rawReturns = await ctx.db
+      .query("returns")
+      .withIndex("by_creation_time", (q) =>
+        q.gte("_creationTime", args.startMs).lte("_creationTime", args.endMs),
+      )
+      .take(MAX_SALES + 1);
+    const returnsScanTruncated = rawReturns.length > MAX_SALES;
+    for (const ret of rawReturns.slice(0, MAX_SALES)) {
+      const b = buckets.get(bucketStartForTs(ret._creationTime, gran, tz));
+      if (b) b.revenue -= ret.totalRefund;
+    }
+
+    const returnsData = await loadReturnsInPeriod(ctx, args.startMs, args.endMs);
+    revenue -= returnsData.totals.refundTotal;
+    // Line profit of returned items = refund - restored COGS (see salesSummary).
+    profit -= returnsData.totals.refundTotal - returnsData.totals.costTotal;
+    units -= returnsData.totals.itemCount;
+
     for (const b of buckets.values()) b.marginPct = b.revenue > 0 ? b.profit / b.revenue : 0;
 
     const span = args.endMs - args.startMs;
-    const prev = await rangeTotals(ctx, args.startMs - span, args.startMs);
+    const prev = await rangeNetTotals(ctx, args.startMs - span, args.startMs);
     const kpi = (value: number, previous: number) => ({
       value, previous, deltaPct: previous === 0 ? null : (value - previous) / previous,
     });
@@ -240,7 +324,7 @@ export const dashboardAnalytics = query({
       topProducts: [...productAgg.values()].sort((a, b) => b.units - a.units).slice(0, 10),
       categoryBreakdown: [...categoryAgg.values()].sort((a, b) => b.revenue - a.revenue),
       granularity: gran,
-      truncated,
+      truncated: salesTruncated || returnsData.truncated || returnsScanTruncated,
     };
   },
 });
@@ -263,8 +347,8 @@ export const cashFlow = query({
         q.gte("_creationTime", args.startMs).lte("_creationTime", args.endMs),
       )
       .take(MAX_SALES + 1);
-    const truncated = rawSales.length > MAX_SALES;
-    const sales = truncated ? rawSales.slice(0, MAX_SALES) : rawSales;
+    const salesTruncated = rawSales.length > MAX_SALES;
+    const sales = salesTruncated ? rawSales.slice(0, MAX_SALES) : rawSales;
 
     // purchases have no purchaseDate index; scan (low volume) and narrow in memory.
     const allPurchases = await ctx.db.query("purchases").take(MAX_SALES + 1);
@@ -291,10 +375,25 @@ export const cashFlow = query({
       if (b) b.spend += p.total;
     }
 
+    // Net out returns: subtract per-bucket revenue attributed by the RETURN's
+    // _creationTime. Spend side is unchanged (returns do not reverse purchases).
+    const rawReturns = await ctx.db
+      .query("returns")
+      .withIndex("by_creation_time", (q) =>
+        q.gte("_creationTime", args.startMs).lte("_creationTime", args.endMs),
+      )
+      .take(MAX_SALES + 1);
+    const returnsTruncated = rawReturns.length > MAX_SALES;
+    for (const ret of rawReturns.slice(0, MAX_SALES)) {
+      totalRevenue -= ret.totalRefund;
+      const b = buckets.get(bucketStartForTs(ret._creationTime, gran, tz));
+      if (b) b.revenue -= ret.totalRefund;
+    }
+
     return {
       buckets: [...buckets.values()].sort((a, b) => a.bucketStart - b.bucketStart),
       totals: { revenue: totalRevenue, spend: totalSpend },
-      truncated,
+      truncated: salesTruncated || returnsTruncated,
     };
   },
 });

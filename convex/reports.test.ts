@@ -255,3 +255,144 @@ test("batchInventory hides empty batches unless includeEmpty is set", async () =
   const all = await admin.query(api.reports.batchInventory, { includeEmpty: true });
   expect(all.rows.filter((r) => r.productId === pid)).toHaveLength(1);
 });
+
+// ---------------------------------------------------------------------------
+// Net-of-returns behaviour
+// ---------------------------------------------------------------------------
+
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Helper: create a product, sell some units, and return the saleId + first
+// saleItemId so a return can be filed against it.
+async function saleAndItem(
+  admin: Awaited<ReturnType<typeof seed>>,
+  product: { name: string; sku: string; category: string; costPrice: number; sellPrice: number },
+  qty: number,
+) {
+  const pid = await admin.mutation(api.products.create, {
+    name: product.name, sku: product.sku, category: product.category,
+    costPrice: product.costPrice, sellPrice: product.sellPrice,
+    stockQty: 100, reorderThreshold: 5,
+  });
+  const { saleId } = await admin.mutation(api.sales.createSale, {
+    items: [{ productId: pid, quantity: qty }], cashTendered: product.sellPrice * qty,
+  });
+  const detail = await admin.query(api.sales.getSale, { saleId });
+  return { pid, saleId, saleItemId: detail!.items[0]._id };
+}
+
+// 1. sale + same-period full return nets to 0 revenue/profit/unitsSold; saleCount stays 1
+test("salesSummary nets out a same-period full return", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const { saleId, saleItemId } = await saleAndItem(admin, { name: "Rice", sku: "r1", category: "Food", costPrice: 30, sellPrice: 50 }, 4);
+  await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 4 }],
+  });
+  const summary = await admin.query(api.reports.salesSummary, { startMs: 0, endMs: 1e15 });
+  expect(summary.revenue).toBe(0);
+  expect(summary.profit).toBe(0);
+  expect(summary.unitsSold).toBe(0);
+  expect(summary.saleCount).toBe(1);
+  expect(summary.truncated).toBe(false);
+});
+
+// 2. partial return leaves residual revenue/units
+test("salesSummary partial return", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const { saleId, saleItemId } = await saleAndItem(admin, { name: "Rice", sku: "r1", category: "Food", costPrice: 30, sellPrice: 50 }, 4);
+  await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 1 }],
+  });
+  const summary = await admin.query(api.reports.salesSummary, { startMs: 0, endMs: 1e15 });
+  expect(summary.revenue).toBe(150); // 200 - 50
+  expect(summary.unitsSold).toBe(3);
+  expect(summary.saleCount).toBe(1);
+});
+
+// 3. topProducts subtracts returned units before ranking
+test("topProducts reflects returned units", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const { pid, saleId, saleItemId } = await saleAndItem(admin, { name: "Mug", sku: "m1", category: "Kitchen", costPrice: 5, sellPrice: 10 }, 10);
+  await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 2 }],
+  });
+  const top = await admin.query(api.reports.topProducts, { startMs: 0, endMs: 1e15, limit: 10 });
+  const row = top.find((r) => r.productId === pid)!;
+  expect(row.unitsSold).toBe(8);
+  expect(row.revenue).toBe(80); // 10*10 - 2*10
+});
+
+// 4. Returns charge the original seller, not the admin who processed the return
+test("cashierPerformance charges the original seller, not the processing admin", async () => {
+  const t = convexTest(schema, modules);
+  const { userId: adminId, as: admin } = await seedUser(t, "Boss", "admin");
+  const { userId: cashierId, as: cashier } = await seedUser(t, "Cash", "cashier");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Pop", sku: "P1", category: "Food", costPrice: 2, sellPrice: 5, stockQty: 100, reorderThreshold: 1,
+  });
+  const { saleId } = await cashier.mutation(api.sales.createSale, {
+    items: [{ productId: pid, quantity: 4 }], cashTendered: 100,
+  });
+  const detail = await admin.query(api.sales.getSale, { saleId });
+  const saleItemId = detail!.items[0]._id;
+  // Admin processes a 1-unit return.
+  await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 1 }],
+  });
+
+  const rows = await admin.query(api.reports.cashierPerformance, { startMs: 0, endMs: Number.MAX_SAFE_INTEGER });
+  const cashierRow = rows.find((r) => r.cashierId === cashierId)!;
+  expect(cashierRow.units).toBe(3);       // 4 sold - 1 returned
+  expect(cashierRow.revenue).toBe(15);    // 20 - 5
+  expect(cashierRow.saleCount).toBe(1);   // sale still counts
+  // The admin never made a sale and is not charged for the return.
+  const adminRow = rows.find((r) => r.cashierId === adminId);
+  expect(adminRow).toBeUndefined();
+});
+
+// 5. A window that excludes the sale but includes the return yields negative revenue
+test("return-only window yields negative revenue", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const { saleId, saleItemId } = await saleAndItem(admin, { name: "Hat", sku: "h1", category: "Accessories", costPrice: 10, sellPrice: 25 }, 2);
+  // Boundary AFTER the sale's _creationTime but BEFORE the return is filed.
+  const midPoint = Date.now();
+  await wait(5);
+  const ret = await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 2 }],
+  });
+  const summary = await admin.query(api.reports.salesSummary, {
+    startMs: midPoint + 1, endMs: Date.now() + 1000,
+  });
+  // No sales in window, one return of 2 @ 25 = 50 refund → revenue = -50.
+  expect(summary.revenue).toBe(-ret.totalRefund);
+  expect(summary.saleCount).toBe(0);
+});
+
+// 6. dashboardAnalytics KPI revenue reflects net-of-returns
+test("dashboardAnalytics reflects net revenue", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const { saleId, saleItemId } = await saleAndItem(admin, { name: "Soda", sku: "s1", category: "Drinks", costPrice: 2, sellPrice: 5 }, 4);
+  await admin.mutation(api.returns.createReturn, {
+    saleId, lines: [{ saleItemId, quantity: 4 }],
+  });
+  const res = await admin.query(api.reports.dashboardAnalytics, {
+    startMs: 0, endMs: 1e15, granularity: "day", tzOffsetMinutes: 0,
+  });
+  expect(res.kpis.revenue.value).toBe(0);   // 20 - 20
+  expect(res.kpis.profit.value).toBe(0);    // 12 - 12
+  expect(res.kpis.units.value).toBe(0);     // 4 - 4
+  expect(res.kpis.transactions.value).toBe(1); // sale still counts
+  expect(res.truncated).toBe(false);
+});
+
+// 7. Truncation when returns exceed the 5000-row cap. This requires seeding
+// >5000 returns and is exercised by loadReturnsInPeriod's own unit tests; the
+// OR- propagation into the reports' `truncated` flag is trivially wired.
+test.skip("truncated flag when returns exceed cap (>5000 returns)", () => {
+  // Intentionally skipped: see comment above.
+});

@@ -9,7 +9,8 @@ export type AuditAction =
   | "sale"
   | "stock_in"
   | "adjustment"
-  | "password_reset";
+  | "password_reset"
+  | "return";
 
 export type RecordAuditArgs = {
   entityTable: string;
