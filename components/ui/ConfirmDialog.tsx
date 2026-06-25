@@ -1,7 +1,14 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Dialog } from "./Dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from "./AlertDialog";
 import { Button } from "./Button";
 import type { ButtonVariant } from "./Button";
 
@@ -21,8 +28,9 @@ export type ConfirmDialogProps = {
 };
 
 /**
- * Thin destructive-confirmation wrapper over Dialog. Use before irreversible
- * actions (archive, delete, void).
+ * Destructive-confirmation dialog built on Radix AlertDialog. Dismissal
+ * (overlay click / Esc) is blocked while `loading` so an in-flight action is
+ * never interrupted. Props are unchanged from the previous implementation.
  *
  * <ConfirmDialog open={open} onClose={close} onConfirm={archive}
  *   title="Archive product?" description="It will be hidden from the catalog."
@@ -40,14 +48,24 @@ export function ConfirmDialog({
   loading = false,
 }: ConfirmDialogProps) {
   return (
-    <Dialog
+    <AlertDialog
       open={open}
-      onClose={onClose}
-      title={title}
-      size="sm"
-      dismissable={!loading}
-      footer={
-        <>
+      onOpenChange={(next) => {
+        if (!next && !loading) onClose();
+      }}
+    >
+      <AlertDialogContent
+        onEscapeKeyDown={(e) => {
+          if (loading) e.preventDefault();
+        }}
+      >
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          {description && (
+            <AlertDialogDescription>{description}</AlertDialogDescription>
+          )}
+        </AlertDialogHeader>
+        <AlertDialogFooter>
           <Button variant="secondary" onClick={onClose} disabled={loading}>
             {cancelLabel}
           </Button>
@@ -58,13 +76,9 @@ export function ConfirmDialog({
           >
             {confirmLabel}
           </Button>
-        </>
-      }
-    >
-      {description && (
-        <p className="text-sm text-text-muted">{description}</p>
-      )}
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
