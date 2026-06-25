@@ -5,12 +5,13 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import ProductSearch, { CartItem } from "@/components/ProductSearch";
-import ProductGrid from "@/components/ProductGrid";
+import ProductGrid, { type AddSource } from "@/components/ProductGrid";
 import CategoryChips from "@/components/pos/CategoryChips";
 import PosFilters from "@/components/pos/PosFilters";
 import Cart from "@/components/Cart";
 import Receipt from "@/components/Receipt";
 import { formatPeso } from "@/lib/format";
+import { flyToCart, findCartTarget } from "@/lib/flyToCart";
 import {
   Alert,
   AlertDescription,
@@ -29,35 +30,79 @@ import {
 export default function PosPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cashTendered, setCashTendered] = useState("");
-  const [completedSaleId, setCompletedSaleId] = useState<Id<"sales"> | null>(null);
+  const [completedSaleId, setCompletedSaleId] = useState<Id<"sales"> | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gridSearch, setGridSearch] = useState("");
   const [category, setCategory] = useState<string | undefined>(undefined);
-  const [stockFilter, setStockFilter] = useState<"all" | "inStock" | "low" | "out">("all");
+  const [stockFilter, setStockFilter] = useState<
+    "all" | "inStock" | "low" | "out"
+  >("all");
   const [helpOpen, setHelpOpen] = useState(false);
+  // Bumps each time an item is added — drives the cart-icon bounce.
+  const [cartBump, setCartBump] = useState(0);
 
   const createSale = useMutation(api.sales.createSale);
   const { success, error: toastError } = useToast();
 
   const searchRef = useRef<HTMLInputElement>(null);
+  const mobileCartIconRef = useRef<HTMLSpanElement>(null);
 
-  const total = cart.reduce((sum, item) => sum + item.sellPrice * item.quantity, 0);
+  // Bump the mobile cart icon whenever an item is added (desktop icon is
+  // bumped inside <Cart /> via the same bumpKey prop).
+  useEffect(() => {
+    if (cartBump === 0) return;
+    const el = mobileCartIconRef.current;
+    if (!el) return;
+    el.classList.remove("cart-bump");
+    void el.offsetWidth;
+    el.classList.add("cart-bump");
+  }, [cartBump]);
+
+  const total = cart.reduce(
+    (sum, item) => sum + item.sellPrice * item.quantity,
+    0,
+  );
   const tendered = parseFloat(cashTendered) || 0;
   const change = tendered - total;
   const canComplete = cart.length > 0 && tendered >= total && !isSubmitting;
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  function handleAddToCart(item: CartItem) {
+  function handleAddToCart(item: CartItem, source: AddSource = null) {
+    // Guard: never let the cart exceed on-hand stock. (Grid cards disable at
+    // the ceiling, but this protects against rapid taps and scan paths.)
+    const existing = cart.find((i) => i.productId === item.productId);
+    const inCart = existing?.quantity ?? 0;
+    if (inCart + item.quantity > item.stockQty) {
+      toastError("No stocks available.");
+      return;
+    }
+
     setCart((prev) => {
-      const existing = prev.findIndex((i) => i.productId === item.productId);
-      if (existing >= 0) {
+      const existingIdx = prev.findIndex((i) => i.productId === item.productId);
+      if (existingIdx >= 0) {
         return prev.map((i, idx) =>
-          idx === existing ? { ...i, quantity: i.quantity + item.quantity } : i
+          idx === existingIdx
+            ? { ...i, quantity: i.quantity + item.quantity }
+            : i,
         );
       }
       return [...prev, item];
     });
+
+    // Fly-to-cart animation from the tapped card (grid only).
+    if (source) {
+      const target = findCartTarget();
+      if (target)
+        flyToCart({
+          sourceRect: source.rect,
+          target,
+          imageUrl: source.imageUrl,
+        });
+    }
+    setCartBump((k) => k + 1);
   }
 
   function handleNewSale() {
@@ -73,7 +118,10 @@ export default function PosPage() {
     setError(null);
     try {
       const result = await createSale({
-        items: cart.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        items: cart.map((i) => ({
+          productId: i.productId,
+          quantity: i.quantity,
+        })),
         cashTendered: tendered,
       });
       setCompletedSaleId(result.saleId);
@@ -137,7 +185,10 @@ export default function PosPage() {
           { keys: "Ctrl / ⌘ + N", label: "New sale" },
           { keys: "?", label: "Show this help" },
         ].map((row) => (
-          <div key={row.keys} className="flex items-center justify-between gap-4">
+          <div
+            key={row.keys}
+            className="flex items-center justify-between gap-4"
+          >
             <dt className="order-2">
               <kbd className="rounded-md border border-border bg-surface-2 px-2 py-1 text-xs font-medium text-text">
                 {row.keys}
@@ -311,13 +362,14 @@ export default function PosPage() {
               search={gridSearch}
               category={category}
               stockFilter={stockFilter}
+              cartItems={cart}
               onAdd={handleAddToCart}
             />
           </section>
 
           <aside className="flex xl:min-h-0">
             <Card className="flex w-full flex-col overflow-hidden xl:h-full xl:min-h-0">
-              <Cart items={cart} onUpdate={setCart} />
+              <Cart items={cart} onUpdate={setCart} bumpKey={cartBump} />
               <div className="hidden shrink-0 border-t border-border p-cell xl:block">
                 {paymentPanel}
               </div>
@@ -330,11 +382,19 @@ export default function PosPage() {
         <details className="group">
           <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
             <span className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <span
+                ref={mobileCartIconRef}
+                data-cart-fly-target
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary"
+              >
                 <Icon name="shopping-cart" size={18} />
               </span>
               <span className="text-sm font-semibold text-text">Cart</span>
-              {cart.length > 0 && <Badge variant="primary">{itemCount}</Badge>}
+              {cart.length > 0 && (
+                <Badge key={itemCount} variant="primary" className="count-pop">
+                  {itemCount}
+                </Badge>
+              )}
             </span>
             <span className="flex items-center gap-2">
               <span className="text-lg font-bold tabular-nums text-text">

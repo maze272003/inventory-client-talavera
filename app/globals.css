@@ -15,72 +15,82 @@
 
 :root {
   /* Color — neutral slate base, indigo primary */
-  --color-bg: #f1f5f9;          /* slate-100 — app canvas (subtle depth vs surface) */
-  --color-surface: #ffffff;     /* cards / panels */
-  --color-surface-2: #f1f5f9;   /* slate-100 — subtle raised / hover */
-  --color-surface-3: #e2e8f0;   /* slate-200 — pressed / inset */
-  --color-border: #e2e8f0;      /* slate-200 */
+  --color-bg: #f1f5f9; /* slate-100 — app canvas (subtle depth vs surface) */
+  --color-surface: #ffffff; /* cards / panels */
+  --color-surface-2: #f1f5f9; /* slate-100 — subtle raised / hover */
+  --color-surface-3: #e2e8f0; /* slate-200 — pressed / inset */
+  --color-border: #e2e8f0; /* slate-200 */
   --color-border-strong: #cbd5e1; /* slate-300 — emphasis dividers */
-  --color-text: #0f172a;        /* slate-900 */
-  --color-text-muted: #64748b;  /* slate-500 */
+  --color-text: #0f172a; /* slate-900 */
+  --color-text-muted: #64748b; /* slate-500 */
   --color-text-subtle: #94a3b8; /* slate-400 — tertiary */
 
-  --color-primary: #4f46e5;       /* indigo-600 */
+  --color-primary: #4f46e5; /* indigo-600 */
   --color-primary-hover: #4338ca; /* indigo-700 */
   --color-primary-fg: #ffffff;
-  --color-primary-soft: #eef2ff;  /* indigo-50 — tinted backgrounds */
+  --color-primary-soft: #eef2ff; /* indigo-50 — tinted backgrounds */
   --color-primary-soft-fg: #4338ca; /* indigo-700 text on tint */
 
-  --color-success: #059669;       /* emerald-600 */
+  --color-success: #059669; /* emerald-600 */
   --color-success-fg: #ffffff;
-  --color-success-bg: #d1fae5;    /* emerald-100 */
+  --color-success-bg: #d1fae5; /* emerald-100 */
 
-  --color-warning: #d97706;       /* amber-600 */
+  --color-warning: #d97706; /* amber-600 */
   --color-warning-fg: #ffffff;
-  --color-warning-bg: #fef3c7;    /* amber-100 */
+  --color-warning-bg: #fef3c7; /* amber-100 */
 
-  --color-danger: #e11d48;        /* rose-600 */
+  --color-danger: #e11d48; /* rose-600 */
   --color-danger-fg: #ffffff;
-  --color-danger-bg: #ffe4e6;     /* rose-100 */
+  --color-danger-bg: #ffe4e6; /* rose-100 */
 
-  --color-info: #0284c7;          /* sky-600 */
+  --color-info: #0284c7; /* sky-600 */
   --color-info-fg: #ffffff;
-  --color-info-bg: #e0f2fe;       /* sky-100 */
+  --color-info-bg: #e0f2fe; /* sky-100 */
 
   /* Focus ring color */
-  --color-ring: #6366f1;          /* indigo-500 */
+  --color-ring: #6366f1; /* indigo-500 */
 
   /* Brand gradient — used for hero accents, brand marks, primary CTAs */
-  --gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  --gradient-primary: linear-gradient(
+    135deg,
+    #6366f1 0%,
+    #4f46e5 50%,
+    #4338ca 100%
+  );
   --gradient-brand: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
 
   /* Radius */
-  --radius-sm: 0.25rem;   /* 4px  */
-  --radius-md: 0.5rem;    /* 8px  */
-  --radius-lg: 0.75rem;   /* 12px */
-  --radius-xl: 1rem;      /* 16px */
+  --radius-sm: 0.25rem; /* 4px  */
+  --radius-md: 0.5rem; /* 8px  */
+  --radius-lg: 0.75rem; /* 12px */
+  --radius-xl: 1rem; /* 16px */
 
   /* Shadow — layered elevation system */
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
-  --shadow-sm: 0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.04);
-  --shadow-md: 0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
-  --shadow-lg: 0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
-  --shadow-xl: 0 20px 25px -5px rgb(15 23 42 / 0.10), 0 8px 10px -6px rgb(15 23 42 / 0.06);
-  --shadow-pop: 0 12px 32px -8px rgb(15 23 42 / 0.18), 0 4px 12px -4px rgb(15 23 42 / 0.10);
+  --shadow-sm:
+    0 1px 2px 0 rgb(15 23 42 / 0.05), 0 1px 3px 0 rgb(15 23 42 / 0.04);
+  --shadow-md:
+    0 4px 6px -1px rgb(15 23 42 / 0.07), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --shadow-lg:
+    0 10px 15px -3px rgb(15 23 42 / 0.08), 0 4px 6px -4px rgb(15 23 42 / 0.05);
+  --shadow-xl:
+    0 20px 25px -5px rgb(15 23 42 / 0.1), 0 8px 10px -6px rgb(15 23 42 / 0.06);
+  --shadow-pop:
+    0 12px 32px -8px rgb(15 23 42 / 0.18), 0 4px 12px -4px rgb(15 23 42 / 0.1);
   --shadow-subtle: 0 0 0 1px rgb(15 23 42 / 0.04);
   --shadow-primary: 0 8px 20px -6px rgb(79 70 229 / 0.45);
 
   /* Layout metrics — the fixed app shell */
-  --topbar-h: 4rem;            /* 64px fixed top navigation bar */
-  --sidebar-w: 16rem;          /* 256px expanded sidebar */
+  --topbar-h: 4rem; /* 64px fixed top navigation bar */
+  --sidebar-w: 16rem; /* 256px expanded sidebar */
   --sidebar-w-collapsed: 4.75rem; /* 76px collapsed (icon rail) */
-  --sidebar-w-tablet: 4.5rem;  /* 72px tablet icon rail */
+  --sidebar-w-tablet: 4.5rem; /* 72px tablet icon rail */
 
   /* Spacing / density — switched via [data-density] below.
      Defaults = comfortable. */
-  --space-row: 0.875rem;   /* vertical rhythm of a table/list row */
-  --space-cell: 0.875rem;  /* table cell padding */
-  --control-h: 2.75rem;    /* 44px — touch-target height for controls */
+  --space-row: 0.875rem; /* vertical rhythm of a table/list row */
+  --space-cell: 0.875rem; /* table cell padding */
+  --control-h: 2.75rem; /* 44px — touch-target height for controls */
 
   /* Z-index / layering scale — keep overlays from fighting */
   --z-dropdown: 1000;
@@ -97,57 +107,67 @@
   --dur-slow: 320ms;
 
   /* Font — wired to Geist in layout.tsx via next CSS vars */
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", "Cascadia Code",
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, "SF Mono", "Cascadia Code",
     "Roboto Mono", monospace;
 }
 
 /* Dark theme overrides — applied when <html> has the .dark class. */
 html.dark {
-  --color-bg: #020617;          /* slate-950 */
-  --color-surface: #0f172a;     /* slate-900 */
-  --color-surface-2: #1e293b;   /* slate-800 */
-  --color-surface-3: #334155;   /* slate-700 */
-  --color-border: #1e293b;      /* slate-800 */
+  --color-bg: #020617; /* slate-950 */
+  --color-surface: #0f172a; /* slate-900 */
+  --color-surface-2: #1e293b; /* slate-800 */
+  --color-surface-3: #334155; /* slate-700 */
+  --color-border: #1e293b; /* slate-800 */
   --color-border-strong: #334155; /* slate-700 */
-  --color-text: #f1f5f9;        /* slate-100 */
-  --color-text-muted: #94a3b8;  /* slate-400 */
+  --color-text: #f1f5f9; /* slate-100 */
+  --color-text-muted: #94a3b8; /* slate-400 */
   --color-text-subtle: #64748b; /* slate-500 */
 
-  --color-primary: #6366f1;       /* indigo-500 */
+  --color-primary: #6366f1; /* indigo-500 */
   --color-primary-hover: #818cf8; /* indigo-400 */
   --color-primary-fg: #ffffff;
-  --color-primary-soft: #1e1b4b;  /* indigo-950 */
+  --color-primary-soft: #1e1b4b; /* indigo-950 */
   --color-primary-soft-fg: #c7d2fe; /* indigo-300 */
 
-  --color-success: #10b981;       /* emerald-500 */
+  --color-success: #10b981; /* emerald-500 */
   --color-success-fg: #022c22;
-  --color-success-bg: #064e3b;    /* emerald-900 */
+  --color-success-bg: #064e3b; /* emerald-900 */
 
-  --color-warning: #f59e0b;       /* amber-500 */
+  --color-warning: #f59e0b; /* amber-500 */
   --color-warning-fg: #1c1917;
-  --color-warning-bg: #78350f;    /* amber-900 */
+  --color-warning-bg: #78350f; /* amber-900 */
 
-  --color-danger: #f43f5e;        /* rose-500 */
+  --color-danger: #f43f5e; /* rose-500 */
   --color-danger-fg: #1c0f12;
-  --color-danger-bg: #881337;     /* rose-900 */
+  --color-danger-bg: #881337; /* rose-900 */
 
-  --color-info: #38bdf8;          /* sky-400 */
+  --color-info: #38bdf8; /* sky-400 */
   --color-info-fg: #082f49;
-  --color-info-bg: #0c4a6e;       /* sky-900 */
+  --color-info-bg: #0c4a6e; /* sky-900 */
 
-  --color-ring: #818cf8;          /* indigo-400 */
+  --color-ring: #818cf8; /* indigo-400 */
 
-  --gradient-primary: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #4f46e5 100%);
+  --gradient-primary: linear-gradient(
+    135deg,
+    #818cf8 0%,
+    #6366f1 50%,
+    #4f46e5 100%
+  );
   --gradient-brand: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.55), 0 4px 6px -4px rgb(0 0 0 / 0.4);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
-  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 12px -4px rgb(0 0 0 / 0.45);
+  --shadow-lg:
+    0 10px 15px -3px rgb(0 0 0 / 0.55), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl:
+    0 20px 25px -5px rgb(0 0 0 / 0.6), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+  --shadow-pop:
+    0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 12px -4px rgb(0 0 0 / 0.45);
   --shadow-subtle: 0 0 0 1px rgb(255 255 255 / 0.04);
   --shadow-primary: 0 8px 20px -6px rgb(99 102 249 / 0.5);
 }
@@ -320,6 +340,44 @@ body {
   }
 }
 
+/* ── Cart feedback animations ──
+   cart-bump: playful bounce applied to the cart icon whenever an item is
+   added. Restarted by toggling the class off/on (forced reflow) in JS. */
+@keyframes cart-bump {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.3) rotate(-10deg);
+  }
+  50% {
+    transform: scale(0.92) rotate(6deg);
+  }
+  75% {
+    transform: scale(1.08) rotate(-2deg);
+  }
+}
+.cart-bump {
+  animation: cart-bump 0.55s var(--ease-spring);
+}
+
+/* count-pop: tiny scale pop for the cart item counter badge. */
+@keyframes count-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.count-pop {
+  animation: count-pop 0.3s var(--ease-spring);
+}
+
 /* ── Receipt print styles ── */
 :root {
   --receipt-width: 80mm;
@@ -330,23 +388,40 @@ body {
 }
 
 @media print {
-  body * { visibility: hidden; }
-  .receipt-print, .receipt-print * { visibility: visible; }
+  body * {
+    visibility: hidden;
+  }
+  .receipt-print,
+  .receipt-print * {
+    visibility: visible;
+  }
   .receipt-print {
     position: absolute;
     top: 0;
     left: 0;
     width: var(--receipt-width);
-    font-family: 'Courier New', Courier, monospace;
+    font-family: "Courier New", Courier, monospace;
     font-size: 11px;
     line-height: 1.4;
   }
-  .screen-only { display: none !important; }
+  .screen-only {
+    display: none !important;
+  }
 }
 
 /* ── Report / Inventory print styles ── */
 @media print {
-  body.printing-report * { visibility: hidden; }
-  body.printing-report .report-print, body.printing-report .report-print * { visibility: visible; }
-  body.printing-report .report-print { position: absolute; top: 0; left: 0; width: 100%; }
+  body.printing-report * {
+    visibility: hidden;
+  }
+  body.printing-report .report-print,
+  body.printing-report .report-print * {
+    visibility: visible;
+  }
+  body.printing-report .report-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
 }

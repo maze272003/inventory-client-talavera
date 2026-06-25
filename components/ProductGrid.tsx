@@ -7,14 +7,27 @@ import { CartItem } from "@/components/ProductSearch";
 import { formatPeso } from "@/lib/format";
 import { Button, Badge, Skeleton, EmptyState, Icon } from "@/components/ui";
 
+/** Extra info passed from a grid tap so the parent can run the fly-to-cart
+ *  animation from the exact card image that was tapped. `null` for non-grid
+ *  adds (e.g. barcode scan). */
+export type AddSource = { rect: DOMRect; imageUrl?: string | null } | null;
+
 type Props = {
   search: string;
   category?: string;
   stockFilter?: "all" | "inStock" | "low" | "out";
-  onAdd: (item: CartItem) => void;
+  /** Current cart, so displayed stock can deduct reserved units in real time. */
+  cartItems: CartItem[];
+  onAdd: (item: CartItem, source: AddSource) => void;
 };
 
-export default function ProductGrid({ search, category, stockFilter, onAdd }: Props) {
+export default function ProductGrid({
+  search,
+  category,
+  stockFilter,
+  cartItems,
+  onAdd,
+}: Props) {
   const { results, status, loadMore } = usePaginatedQuery(
     api.products.list,
     {
@@ -27,6 +40,14 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
   );
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Reserved quantity per product, derived from the cart. Recomputed each
+  // render so the displayed "available" stock stays live as the cart changes.
+  const inCartMap = new Map<string, number>();
+  for (const i of cartItems) {
+    inCartMap.set(i.productId, (inCartMap.get(i.productId) ?? 0) + i.quantity);
+  }
+
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
@@ -82,38 +103,59 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {results.map((product) => {
-          const outOfStock = product.stockQty <= 0;
+          const inCart = inCartMap.get(product._id) ?? 0;
+          // Available = on-hand minus units already reserved in the cart.
+          // This is what the POS "deducts" instantly, before the sale completes.
+          const available = Math.max(0, product.stockQty - inCart);
+          const outOfStock = available <= 0;
           const lowStock =
-            product.stockQty > 0 && product.stockQty <= product.reorderThreshold;
+            available > 0 && available <= product.reorderThreshold;
 
           return (
             <button
               key={product._id}
               type="button"
               disabled={outOfStock}
-              onClick={() =>
-                onAdd({
-                  productId: product._id,
-                  name: product.name,
-                  sku: product.sku,
-                  barcode: product.barcode,
-                  sellPrice: product.sellPrice,
-                  stockQty: product.stockQty,
-                  quantity: 1,
-                })
-              }
+              onClick={(e) => {
+                const wrap = e.currentTarget.querySelector<HTMLElement>(
+                  "[data-product-image]",
+                );
+                const img = wrap?.querySelector("img");
+                onAdd(
+                  {
+                    productId: product._id,
+                    name: product.name,
+                    sku: product.sku,
+                    barcode: product.barcode,
+                    sellPrice: product.sellPrice,
+                    stockQty: product.stockQty,
+                    quantity: 1,
+                  },
+                  wrap
+                    ? {
+                        rect: wrap.getBoundingClientRect(),
+                        imageUrl:
+                          img?.getAttribute("src") ?? product.imageUrl ?? null,
+                      }
+                    : null,
+                );
+              }}
               aria-label={`Add ${product.name} to cart, ${formatPeso(product.sellPrice)}${
                 outOfStock ? ", out of stock" : ""
-              }`}
+              }${inCart > 0 ? `, ${inCart} in cart` : ""}`}
               className={[
                 "group relative flex flex-col overflow-hidden rounded-xl border text-left transition-all",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 outOfStock
                   ? "cursor-not-allowed border-border bg-surface-2 opacity-60"
                   : "cursor-pointer border-border bg-surface shadow-sm hover:-translate-y-0.5 hover:border-primary hover:shadow-md motion-reduce:transform-none",
+                inCart > 0 && !outOfStock ? "ring-2 ring-primary/40" : "",
               ].join(" ")}
             >
-              <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-brand-gradient-soft">
+              <div
+                data-product-image
+                className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-brand-gradient-soft"
+              >
                 {product.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -124,7 +166,11 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none"
                   />
                 ) : (
-                  <Icon name="package" size={36} className="text-text-subtle opacity-60" />
+                  <Icon
+                    name="package"
+                    size={36}
+                    className="text-text-subtle opacity-60"
+                  />
                 )}
                 {!outOfStock && (
                   <span
@@ -132,6 +178,12 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                     className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-fg opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100 motion-reduce:transition-none"
                   >
                     <Icon name="plus" size={18} />
+                  </span>
+                )}
+                {inCart > 0 && !outOfStock && (
+                  <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg shadow-sm">
+                    <Icon name="shopping-cart" size={11} />
+                    <span className="tabular-nums">{inCart}</span>
                   </span>
                 )}
                 {outOfStock && (
@@ -161,11 +213,9 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                   </span>
                   {!outOfStock &&
                     (lowStock ? (
-                      <Badge variant="warning">Stock: {product.stockQty}</Badge>
+                      <Badge variant="warning">Stock: {available}</Badge>
                     ) : (
-                      <Badge variant="success">
-                        Stock: {product.stockQty}
-                      </Badge>
+                      <Badge variant="success">Stock: {available}</Badge>
                     ))}
                 </div>
               </div>
@@ -177,12 +227,16 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
       <div ref={sentinelRef} aria-hidden className="h-1" />
       {status === "LoadingMore" && (
         <div className="flex justify-center py-2">
-          <Button variant="secondary" loading disabled>Loading</Button>
+          <Button variant="secondary" loading disabled>
+            Loading
+          </Button>
         </div>
       )}
       {status === "CanLoadMore" && (
         <div className="flex justify-center">
-          <Button variant="secondary" onClick={() => loadMore(24)}>Load more</Button>
+          <Button variant="secondary" onClick={() => loadMore(24)}>
+            Load more
+          </Button>
         </div>
       )}
     </div>

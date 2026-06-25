@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useEffect, useRef } from "react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { formatPeso } from "@/lib/format";
@@ -41,14 +42,34 @@ function BatchPreview({
 type Props = {
   items: CartItem[];
   onUpdate: (items: CartItem[]) => void;
+  /** Increments each time an item is added; drives the cart-icon bump. */
+  bumpKey?: number;
 };
 
-export default function Cart({ items, onUpdate }: Props) {
+export default function Cart({ items, onUpdate, bumpKey = 0 }: Props) {
+  const iconWrapRef = useRef<HTMLSpanElement>(null);
+
+  // Total units (not line items) — the "how many in the cart" figure.
+  const unitCount = items.reduce((s, i) => s + i.quantity, 0);
+
+  // Re-trigger the bump animation whenever a new item is added. We remove the
+  // class, force a reflow, then re-add it so the keyframe restarts each time.
+  useEffect(() => {
+    if (bumpKey === 0) return;
+    const el = iconWrapRef.current;
+    if (!el) return;
+    el.classList.remove("cart-bump");
+    void el.offsetWidth;
+    el.classList.add("cart-bump");
+  }, [bumpKey]);
+
   function updateQty(index: number, delta: number) {
     const updated = items.map((item, i) => {
       if (i !== index) return item;
       const newQty = item.quantity + delta;
       if (newQty < 1) return item;
+      // Never exceed on-hand stock — keeps cart in sync with inventory.
+      if (newQty > item.stockQty) return item;
       return { ...item, quantity: newQty };
     });
     onUpdate(updated);
@@ -62,13 +83,22 @@ export default function Cart({ items, onUpdate }: Props) {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-cell py-row">
         <h2 className="flex items-center gap-2 text-base font-semibold text-text">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <span
+            ref={iconWrapRef}
+            data-cart-fly-target
+            className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"
+          >
             <Icon name="shopping-cart" size={16} />
           </span>
           Current Sale
-          {items.length > 0 && (
-            <Badge variant="primary" aria-label={`${items.length} line items`}>
-              {items.length}
+          {unitCount > 0 && (
+            <Badge
+              key={unitCount}
+              variant="primary"
+              aria-label={`${unitCount} item${unitCount === 1 ? "" : "s"} in cart`}
+              className="count-pop"
+            >
+              {unitCount}
             </Badge>
           )}
         </h2>
@@ -118,13 +148,17 @@ export default function Cart({ items, onUpdate }: Props) {
                       </span>
                       {item.barcode && (
                         <>
-                          <span aria-hidden className="text-text-subtle">·</span>
+                          <span aria-hidden className="text-text-subtle">
+                            ·
+                          </span>
                           <span className="truncate font-mono text-text-muted">
                             {item.barcode}
                           </span>
                         </>
                       )}
-                      <span aria-hidden className="text-text-subtle">·</span>
+                      <span aria-hidden className="text-text-subtle">
+                        ·
+                      </span>
                       <span className="text-text-muted">
                         {formatPeso(item.sellPrice)} each
                       </span>
@@ -170,7 +204,8 @@ export default function Cart({ items, onUpdate }: Props) {
                     <button
                       type="button"
                       onClick={() => updateQty(index, 1)}
-                      className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      disabled={item.quantity >= item.stockQty}
+                      className="flex h-9 w-9 items-center justify-center rounded-md border border-border bg-surface text-text transition-colors hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`Increase quantity of ${item.name}`}
                     >
                       <Icon name="plus" size={16} />
