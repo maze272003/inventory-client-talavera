@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
 import {
+  Alert,
+  AlertDescription,
   Button,
   Card,
   CardBody,
@@ -167,13 +169,10 @@ export default function LoginPage() {
                 </Field>
 
                 {error && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-md border border-danger-fg/30 bg-danger-bg px-3 py-2 text-sm text-danger-fg"
-                  >
-                    <Icon name="alert-triangle" className="mt-0.5 shrink-0" />
-                    <span>{error}</span>
-                  </div>
+                  <Alert variant="destructive">
+                    <Icon name="alert-triangle" size={16} />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
                 )}
 
                 <Button

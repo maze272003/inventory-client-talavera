@@ -14,6 +14,8 @@ import PurchaseLineRow, {
 import type { ParsedInvoice } from "@/lib/ocr/types";
 import { formatPeso } from "@/lib/format";
 import {
+  Alert,
+  AlertDescription,
   Button,
   Card,
   CardBody,
@@ -381,13 +383,10 @@ export default function ImportPage() {
               </p>
             )}
             {uploadError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-danger bg-danger-bg px-3 py-2 text-sm text-danger-fg"
-              >
-                <Icon name="alert-triangle" />
-                <span>{uploadError}</span>
-              </div>
+              <Alert variant="destructive">
+                <Icon name="alert-triangle" size={16} />
+                <AlertDescription>{uploadError}</AlertDescription>
+              </Alert>
             )}
 
             {/* OCR auto-extract status */}
@@ -562,13 +561,10 @@ export default function ImportPage() {
             </div>
 
             {submitError && (
-              <div
-                role="alert"
-                className="mt-3 flex items-start gap-2 rounded-md border border-danger bg-danger-bg px-3 py-2 text-sm text-danger-fg"
-              >
-                <Icon name="alert-triangle" />
-                <span>{submitError}</span>
-              </div>
+              <Alert variant="destructive">
+                <Icon name="alert-triangle" size={16} />
+                <AlertDescription>{submitError}</AlertDescription>
+              </Alert>
             )}
 
             <Button

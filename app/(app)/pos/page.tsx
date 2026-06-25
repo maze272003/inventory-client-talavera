@@ -12,6 +12,8 @@ import Cart from "@/components/Cart";
 import Receipt from "@/components/Receipt";
 import { formatPeso } from "@/lib/format";
 import {
+  Alert,
+  AlertDescription,
   PageHeader,
   Card,
   CardBody,
@@ -220,13 +222,10 @@ export default function PosPage() {
       )}
 
       {error && (
-        <div
-          role="alert"
-          className="flex items-start gap-2 rounded-lg border border-danger-fg/30 bg-danger-bg px-4 py-3 text-sm text-danger-fg"
-        >
-          <Icon name="alert-triangle" size={16} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
+        <Alert variant="destructive">
+          <Icon name="alert-triangle" size={16} />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       <Button

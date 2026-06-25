@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { Dialog, Button, Field, Input, useToast } from "@/components/ui";
+import { Alert, AlertDescription, Dialog, Button, Field, Input, Icon, useToast } from "@/components/ui";
 
 type Props = {
   open: boolean;
@@ -110,12 +110,10 @@ export default function AdjustDialog({
         </Field>
 
         {error && (
-          <p
-            role="alert"
-            className="text-sm text-danger-fg bg-danger-bg rounded-lg px-cell py-2"
-          >
-            {error}
-          </p>
+          <Alert variant="destructive">
+            <Icon name="alert-triangle" size={16} />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
       </form>
     </Dialog>

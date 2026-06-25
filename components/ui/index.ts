@@ -43,6 +43,8 @@ export type { DialogProps } from "./Dialog";
 export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogProps } from "./ConfirmDialog";
 
+export { Alert, AlertTitle, AlertDescription } from "./Alert";
+
 export { Drawer } from "./Drawer";
 export type { DrawerProps, DrawerSide } from "./Drawer";
 

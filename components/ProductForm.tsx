@@ -5,6 +5,8 @@ import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
+  Alert,
+  AlertDescription,
   Button,
   Drawer,
   Field,
@@ -340,12 +342,10 @@ export default function ProductForm({ product, open, onClose }: Props) {
         </div>
 
         {error && (
-          <p
-            role="alert"
-            className="text-sm text-danger-fg bg-danger-bg border border-danger-fg/20 rounded-md px-3 py-2"
-          >
-            {error}
-          </p>
+          <Alert variant="destructive">
+            <Icon name="alert-triangle" size={16} />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
       </form>
     </Drawer>
