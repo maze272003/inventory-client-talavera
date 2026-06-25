@@ -24,7 +24,7 @@ export type ScannedProduct = {
   imageUrl?: string | null;
 };
 
-export type ConfirmMode = "blocked" | "warn";
+export type ConfirmMode = "blocked" | "warn" | "confirm";
 
 export type ConfirmReason =
   | "inactive"
@@ -36,7 +36,8 @@ export type ScanConfirmDialogProps = {
   open: boolean;
   product: ScannedProduct | null;
   mode: ConfirmMode;
-  reason: ConfirmReason;
+  /** Present only for blocked/warn modes (a validation issue). Omitted for a clean confirm. */
+  reason?: ConfirmReason;
   /** Units that can still be added (= stockQty − qty already in cart). */
   maxQty: number;
   inCartQty: number;
@@ -73,10 +74,12 @@ const REASON_META: Record<
 };
 
 /**
- * Confirm-an-item dialog shown after a barcode/SKU scan when a validation
- * issue exists (out-of-stock, inactive, low-stock, or stock-limit reached).
- * Healthy items bypass this entirely and are added directly (POS speed rule).
- * The cashier can set a quantity (capped at available stock) before confirming.
+ * Confirm-an-item dialog shown after every barcode/SKU scan, BEFORE the item is
+ * added to the cart — so the cashier can verify the right product was scanned
+ * and set a quantity. The dialog also enforces validations:
+ *   - blocked (inactive / out-of-stock / stock-limit reached): Add disabled.
+ *   - warn (low-stock): Add enabled, qty capped at available stock.
+ *   - confirm (healthy): clean verify, qty capped at available stock.
  */
 export function ScanConfirmDialog({
   open,
@@ -95,14 +98,15 @@ export function ScanConfirmDialog({
 
   if (!product) return null;
 
-  const meta = REASON_META[reason];
+  const meta = reason ? REASON_META[reason] : null;
   const blocked = mode === "blocked";
   const effectiveMax = Math.max(1, maxQty);
   const clampedQty = Math.max(1, Math.min(qty, effectiveMax));
-  const toneCls =
-    meta.tone === "danger"
+  const toneCls = meta
+    ? meta.tone === "danger"
       ? "border-danger/30 bg-danger-bg text-danger"
-      : "border-warning/30 bg-warning-bg text-warning";
+      : "border-warning/30 bg-warning-bg text-warning"
+    : "";
 
   function handleConfirm() {
     if (blocked) return;
@@ -175,19 +179,21 @@ export function ScanConfirmDialog({
           </span>
         </div>
 
-        {/* Validation banner */}
-        <div
-          role={blocked ? "alert" : "status"}
-          className={cn(
-            "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
-            toneCls,
-          )}
-        >
-          <Icon name={meta.icon} size={14} className="mt-0.5 shrink-0" />
-          <span>{meta.message({ maxQty, stockQty: product.stockQty })}</span>
-        </div>
+        {/* Validation banner (only when there's an issue) */}
+        {meta && (
+          <div
+            role={blocked ? "alert" : "status"}
+            className={cn(
+              "flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+              toneCls,
+            )}
+          >
+            <Icon name={meta.icon} size={14} className="mt-0.5 shrink-0" />
+            <span>{meta.message({ maxQty, stockQty: product.stockQty })}</span>
+          </div>
+        )}
 
-        {/* Quantity (warn only — blocked has nothing to add) */}
+        {/* Quantity (warn + confirm — blocked has nothing to add) */}
         {!blocked && (
           <Field label="Quantity" hint={`Max ${effectiveMax} for available stock`}>
             <Input

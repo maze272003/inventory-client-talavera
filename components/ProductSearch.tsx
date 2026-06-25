@@ -100,7 +100,7 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
   const [confirm, setConfirm] = useState<{
     product: ScannedProduct;
     mode: ConfirmMode;
-    reason: ConfirmReason;
+    reason: ConfirmReason | undefined;
     maxQty: number;
     inCartQty: number;
     nonce: number;
@@ -166,7 +166,7 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
 
       const openConfirm = (
         mode: ConfirmMode,
-        reason: ConfirmReason,
+        reason: ConfirmReason | undefined,
         maxQty: number,
       ) => {
         confirmNonceRef.current += 1;
@@ -193,12 +193,11 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
         openConfirm("warn", "low-stock", available);
         return;
       }
-      // Healthy: add directly, keep the register fast.
-      commitAdd(product, 1);
+      // Healthy: still show the product for verification before adding.
       resetSearch();
-      inputRef.current?.focus();
+      openConfirm("confirm", undefined, available);
     },
-    [commitAdd, qtyInCart, resetSearch],
+    [qtyInCart, resetSearch],
   );
 
   const handleSkuFound = useCallback(

@@ -26,15 +26,14 @@ function BatchPreview({
   }
   if (parts.length === 0) return null;
   return (
-    <p
-      className="truncate text-[11px] text-text-subtle"
-      title={parts.join(", ")}
-    >
-      <span className="inline-flex items-center gap-1 align-middle">
-        <Icon name="layers" size={11} className="shrink-0 text-text-subtle" />
-        FIFO: {parts.join(", ")}
+    <p className="truncate text-xs text-text" title={parts.join(", ")}>
+      <span className="inline-flex items-center gap-1 align-middle font-bold">
+        <Icon name="layers" size={12} className="shrink-0 text-text-muted" />
+        Batch: {parts.join(", ")}
       </span>
-      {need > 0 ? " (short!)" : ""}
+      {need > 0 ? (
+        <span className="font-medium text-warning-fg"> (short!)</span>
+      ) : null}
     </p>
   );
 }
@@ -113,10 +112,15 @@ export default function Cart({ items, onUpdate }: Props) {
                     <p className="truncate text-sm font-semibold text-text">
                       {item.name}
                     </p>
-                    <p className="truncate text-xs text-text-muted">
-                      {item.sku} <span aria-hidden>·</span>{" "}
-                      {formatPeso(item.sellPrice)} each
-                    </p>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="truncate font-bold text-text">
+                        SKU: {item.sku}
+                      </span>
+                      <span aria-hidden className="text-text-subtle">·</span>
+                      <span className="text-text-muted">
+                        {formatPeso(item.sellPrice)} each
+                      </span>
+                    </div>
                     <BatchPreview
                       productId={item.productId}
                       quantity={item.quantity}

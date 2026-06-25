@@ -146,9 +146,14 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                 <p className="line-clamp-2 text-sm font-semibold leading-tight text-text">
                   {product.name}
                 </p>
-                <p className="truncate text-[11px] text-text-muted">
-                  SKU {product.sku}
+                <p className="truncate text-xs font-bold text-text">
+                  SKU: {product.sku}
                 </p>
+                {product.batchNumber && (
+                  <p className="truncate text-xs font-bold text-text">
+                    Batch: {product.batchNumber}
+                  </p>
+                )}
                 <div className="mt-auto flex items-end justify-between gap-2 pt-1">
                   <span className="text-base font-bold tabular-nums text-primary">
                     {formatPeso(product.sellPrice)}
