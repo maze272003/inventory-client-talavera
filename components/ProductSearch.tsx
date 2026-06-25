@@ -6,6 +6,11 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { Field, Input, Icon, Badge, Button } from "@/components/ui";
 import CameraScanner from "@/components/CameraScanner";
+import ScanConfirmDialog, {
+  type ConfirmMode,
+  type ConfirmReason,
+  type ScannedProduct,
+} from "@/components/ScanConfirmDialog";
 
 export type CartItem = {
   productId: Id<"products">;
@@ -16,16 +21,10 @@ export type CartItem = {
   quantity: number;
 };
 
-type ProductHit = {
-  _id: Id<"products">;
-  name: string;
-  sku: string;
-  sellPrice: number;
-  stockQty: number;
-};
-
 type Props = {
   onAddToCart: (item: CartItem) => void;
+  /** Current cart, so stock-ceiling / low-stock checks reflect what's already added. */
+  cartItems: CartItem[];
 };
 
 /**
@@ -38,7 +37,7 @@ function SkuLookup({
   onNotFound,
 }: {
   sku: string;
-  onFound: (product: ProductHit) => void;
+  onFound: (product: ScannedProduct) => void;
   onNotFound: (sku: string) => void;
 }) {
   const result = useQuery(api.products.getBySku, { sku });
@@ -65,7 +64,7 @@ function BatchLookup({
   onNotFound,
 }: {
   batchNumber: string;
-  onFound: (product: ProductHit) => void;
+  onFound: (product: ScannedProduct) => void;
   onNotFound: (batchNumber: string) => void;
 }) {
   const result = useQuery(api.batches.findByBatchNumber, { batchNumber });
@@ -73,9 +72,7 @@ function BatchLookup({
   useEffect(() => {
     if (result === undefined) return;
     if (result !== null) {
-      // findByBatchNumber returns { product: {...product, imageUrl}, batch }.
-      // Cast to ProductHit — the extra imageUrl field is harmless.
-      onFound(result.product as unknown as ProductHit);
+      onFound(result.product);
     } else {
       onNotFound(batchNumber);
     }
@@ -85,7 +82,7 @@ function BatchLookup({
 }
 
 const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch(
-  { onAddToCart },
+  { onAddToCart, cartItems },
   forwardedRef
 ) {
   const [inputValue, setInputValue] = useState("");
@@ -97,6 +94,17 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
   // Batch-number lookup: set when an SKU miss reveals a BN- term
   const [batchLookupTerm, setBatchLookupTerm] = useState<string | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  // Confirm-dialog state — non-null only while a validation issue is pending.
+  // `nonce` changes per confirmation so the dialog remounts (resetting its qty).
+  const confirmNonceRef = useRef(0);
+  const [confirm, setConfirm] = useState<{
+    product: ScannedProduct;
+    mode: ConfirmMode;
+    reason: ConfirmReason;
+    maxQty: number;
+    inCartQty: number;
+    nonce: number;
+  } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Expose the input element to a forwarded ref (for the focus-search shortcut)
@@ -116,24 +124,86 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
     { initialNumItems: 10 }
   );
 
-  const handleSkuFound = useCallback(
-    (product: ProductHit) => {
-      const item: CartItem = {
+  const qtyInCart = useCallback(
+    (productId: Id<"products">) =>
+      cartItems.filter((i) => i.productId === productId).reduce((s, i) => s + i.quantity, 0),
+    [cartItems],
+  );
+
+  const resetSearch = useCallback(() => {
+    setInputValue("");
+    setLookupSku(null);
+    setBatchLookupTerm(null);
+    setSkuNotFound(false);
+    setSearchTerm(null);
+  }, []);
+
+  const commitAdd = useCallback(
+    (product: ScannedProduct, qty: number) => {
+      onAddToCart({
         productId: product._id,
         name: product.name,
         sku: product.sku,
         sellPrice: product.sellPrice,
         stockQty: product.stockQty,
-        quantity: 1,
+        quantity: qty,
+      });
+    },
+    [onAddToCart],
+  );
+
+  /**
+   * Validation router. Healthy items (active, in stock, above threshold) take
+   * the fast path and are added directly — preserving POS scan speed. A confirm
+   * dialog is shown ONLY for a validation issue: inactive, out-of-stock,
+   * stock-limit already reached, or low-stock warning.
+   */
+  const tryAddProduct = useCallback(
+    (product: ScannedProduct) => {
+      const inCart = qtyInCart(product._id);
+      const stock = product.stockQty;
+      const available = stock - inCart;
+
+      const openConfirm = (
+        mode: ConfirmMode,
+        reason: ConfirmReason,
+        maxQty: number,
+      ) => {
+        confirmNonceRef.current += 1;
+        setConfirm({ product, mode, reason, maxQty, inCartQty: inCart, nonce: confirmNonceRef.current });
       };
-      onAddToCart(item);
-      setInputValue("");
-      setLookupSku(null);
-      setSkuNotFound(false);
-      setSearchTerm(null);
+
+      if (!product.isActive) {
+        resetSearch();
+        openConfirm("blocked", "inactive", 0);
+        return;
+      }
+      if (stock <= 0) {
+        resetSearch();
+        openConfirm("blocked", "out-of-stock", 0);
+        return;
+      }
+      if (available <= 0) {
+        resetSearch();
+        openConfirm("blocked", "stock-limit", 0);
+        return;
+      }
+      if (stock <= product.reorderThreshold) {
+        resetSearch();
+        openConfirm("warn", "low-stock", available);
+        return;
+      }
+      // Healthy: add directly, keep the register fast.
+      commitAdd(product, 1);
+      resetSearch();
       inputRef.current?.focus();
     },
-    [onAddToCart]
+    [commitAdd, qtyInCart, resetSearch],
+  );
+
+  const handleSkuFound = useCallback(
+    (product: ScannedProduct) => tryAddProduct(product),
+    [tryAddProduct],
   );
 
   const handleSkuNotFound = useCallback((sku: string) => {
@@ -148,24 +218,8 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
   }, []);
 
   const handleBatchFound = useCallback(
-    (product: ProductHit) => {
-      const item: CartItem = {
-        productId: product._id,
-        name: product.name,
-        sku: product.sku,
-        sellPrice: product.sellPrice,
-        stockQty: product.stockQty,
-        quantity: 1,
-      };
-      onAddToCart(item);
-      setInputValue("");
-      setBatchLookupTerm(null);
-      setLookupSku(null);
-      setSkuNotFound(false);
-      setSearchTerm(null);
-      inputRef.current?.focus();
-    },
-    [onAddToCart]
+    (product: ScannedProduct) => tryAddProduct(product),
+    [tryAddProduct],
   );
 
   const handleBatchNotFound = useCallback((bn: string) => {
@@ -191,21 +245,8 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
     }
   }
 
-  function handleSelectProduct(product: ProductHit) {
-    const item: CartItem = {
-      productId: product._id,
-      name: product.name,
-      sku: product.sku,
-      sellPrice: product.sellPrice,
-      stockQty: product.stockQty,
-      quantity: 1,
-    };
-    onAddToCart(item);
-    setInputValue("");
-    setLookupSku(null);
-    setSearchTerm(null);
-    setSkuNotFound(false);
-    inputRef.current?.focus();
+  function handleSelectProduct(product: ScannedProduct) {
+    tryAddProduct(product);
   }
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -313,6 +354,25 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
       {searchTerm !== null && searchResults && searchResults.length === 0 && (
         <p className="text-xs text-text-muted">No products found.</p>
       )}
+
+      <ScanConfirmDialog
+        key={confirm?.nonce ?? 0}
+        open={confirm !== null}
+        product={confirm?.product ?? null}
+        mode={confirm?.mode ?? "blocked"}
+        reason={confirm?.reason ?? "out-of-stock"}
+        maxQty={confirm?.maxQty ?? 0}
+        inCartQty={confirm?.inCartQty ?? 0}
+        onClose={() => {
+          setConfirm(null);
+          inputRef.current?.focus();
+        }}
+        onConfirm={(qty) => {
+          if (confirm) commitAdd(confirm.product, qty);
+          setConfirm(null);
+          inputRef.current?.focus();
+        }}
+      />
     </div>
   );
 });

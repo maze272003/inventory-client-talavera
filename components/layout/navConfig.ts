@@ -30,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
     links: [
       { href: "/products", label: "Products", icon: "tag", adminOnly: true },
       { href: "/inventory", label: "Inventory", icon: "boxes", adminOnly: true },
+      { href: "/inventory/health", label: "Health", icon: "gauge", adminOnly: true },
     ],
   },
   {

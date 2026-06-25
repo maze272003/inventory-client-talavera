@@ -44,6 +44,8 @@ export default function DashboardPage() {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [topMetric, setTopMetric] = useState<TopMetric>("units");
+  // Session-stable `now` for the health summary (avoids render-time impurity).
+  const [healthNowMs] = useState(() => Date.now());
 
   const range = useMemo(() => {
     if (preset === "custom") {
@@ -62,6 +64,10 @@ export default function DashboardPage() {
 
   const analytics = useQuery(api.reports.dashboardAnalytics, queryArgs);
   const cash = useQuery(api.reports.cashFlow, queryArgs);
+  const health = useQuery(
+    api.inventoryHealth.summary,
+    isAdmin ? { nowMs: healthNowMs } : "skip",
+  );
 
   const presets: { value: Preset; label: string }[] = [
     { value: "today", label: "Today" },
@@ -264,6 +270,45 @@ export default function DashboardPage() {
               loading={analytics === undefined}
             />
           </div>
+
+          <Link href="/inventory/health" className="group block">
+            <Card interactive className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <CardBody className="flex items-center gap-4 p-4">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning-bg text-warning">
+                  <Icon name="gauge" size={22} />
+                </span>
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-text">Inventory Health</h2>
+                  <p className="text-sm text-text-muted">
+                    {health === undefined
+                      ? "Checking stock health…"
+                      : health.stockoutCount === 0 && health.deadStockValue === 0
+                        ? "Catalog is healthy — no risks flagged"
+                        : [
+                            health.stockoutCount > 0
+                              ? `${health.stockoutCount} at stockout risk`
+                              : null,
+                            health.deadStockValue > 0
+                              ? `${formatPeso(health.deadStockValue)} dead stock`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                  </p>
+                </div>
+              </CardBody>
+              <div className="flex items-center gap-2 pr-4 self-center">
+                <span className="hidden text-sm font-medium text-primary sm:inline">
+                  View health
+                </span>
+                <Icon
+                  name="arrow-up-right"
+                  size={18}
+                  className="text-text-subtle transition-opacity group-hover:opacity-100 sm:opacity-0"
+                />
+              </div>
+            </Card>
+          </Link>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <ChartFrame title="Revenue & Profit" className="xl:col-span-2" loading={analytics === undefined} empty={trendData.length === 0}>

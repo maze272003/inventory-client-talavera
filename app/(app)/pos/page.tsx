@@ -53,7 +53,7 @@ export default function PosPage() {
       const existing = prev.findIndex((i) => i.productId === item.productId);
       if (existing >= 0) {
         return prev.map((i, idx) =>
-          idx === existing ? { ...i, quantity: i.quantity + 1 } : i
+          idx === existing ? { ...i, quantity: i.quantity + item.quantity } : i
         );
       }
       return [...prev, item];
@@ -281,7 +281,11 @@ export default function PosPage() {
           <section className="space-y-4 xl:min-h-0 xl:overflow-y-auto xl:pr-1">
             <Card>
               <CardBody>
-                <ProductSearch ref={searchRef} onAddToCart={handleAddToCart} />
+                <ProductSearch
+                  ref={searchRef}
+                  onAddToCart={handleAddToCart}
+                  cartItems={cart}
+                />
               </CardBody>
             </Card>
 
