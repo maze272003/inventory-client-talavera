@@ -82,7 +82,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-lg border border-border bg-surface p-4 shadow-sm transition-shadow hover:shadow-md",
+        "group relative overflow-hidden rounded-lg border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md",
         className,
       )}
     >
@@ -103,18 +103,18 @@ export function StatCard({
       </div>
 
       <div className="mt-3 space-y-0.5">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {label}
         </p>
         {loading ? (
           <Skeleton height={28} width="70%" />
         ) : (
-          <p className="text-2xl font-bold tracking-tight text-text tabular-nums">
+          <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
             {value}
           </p>
         )}
         {hint && !loading && (
-          <p className="text-xs text-text-subtle">{hint}</p>
+          <p className="text-xs text-muted-foreground">{hint}</p>
         )}
       </div>
     </div>

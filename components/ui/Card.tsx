@@ -8,7 +8,7 @@ export type CardProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 /**
- * Surface container with border-first elevation. Compose with CardHeader /
+ * Surface container on shadcn's card tokens. Compose with CardHeader /
  * CardBody / CardFooter, or drop children directly.
  *
  * <Card><CardBody>…</CardBody></Card>
@@ -20,8 +20,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
   return (
     <div
       ref={ref}
+      data-slot="card"
       className={cn(
-        "bg-surface border border-border rounded-lg shadow-sm",
+        "bg-card text-card-foreground border border-border rounded-lg shadow-sm",
         interactive &&
           "transition-shadow hover:shadow-md cursor-pointer focus-within:ring-2 focus-within:ring-ring",
         className,
@@ -37,6 +38,7 @@ export function CardHeader({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      data-slot="card-header"
       className={cn(
         "px-cell py-row border-b border-border flex items-center justify-between gap-3",
         className,
@@ -50,7 +52,9 @@ export function CardBody({
   className,
   ...rest
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("p-cell", className)} {...rest} />;
+  return (
+    <div data-slot="card-content" className={cn("p-cell", className)} {...rest} />
+  );
 }
 
 export function CardFooter({
@@ -59,6 +63,7 @@ export function CardFooter({
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
+      data-slot="card-footer"
       className={cn(
         "px-cell py-row border-t border-border flex items-center justify-end gap-2",
         className,
