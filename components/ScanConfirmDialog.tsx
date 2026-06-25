@@ -17,6 +17,7 @@ export type ScannedProduct = {
   _id: Id<"products">;
   name: string;
   sku: string;
+  barcode?: string;
   sellPrice: number;
   stockQty: number;
   isActive: boolean;
@@ -158,6 +159,11 @@ export function ScanConfirmDialog({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-text">{product.name}</p>
             <p className="text-xs text-text-muted">SKU: {product.sku}</p>
+            {product.barcode && (
+              <p className="font-mono text-xs text-text-muted">
+                Barcode: {product.barcode}
+              </p>
+            )}
             <p className="mt-1 text-lg font-bold tabular-nums text-text">
               {formatPeso(product.sellPrice)}
             </p>

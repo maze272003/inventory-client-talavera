@@ -298,3 +298,113 @@ export const cashFlow = query({
     };
   },
 });
+
+// ---------------------------------------------------------------------------
+// Inventory batch reporting
+// ---------------------------------------------------------------------------
+
+export type BatchInventoryRow = {
+  productId: Id<"products">;
+  name: string;
+  sku: string;
+  barcode: string | null;
+  category: string;
+  productActive: boolean;
+  batchId: Id<"batches">;
+  batchNumber: string;
+  qtyReceived: number;
+  qtyRemaining: number;
+  unitCost: number;
+  receivedDate: number;
+  expiryDate: number | null;
+  batchActive: boolean;
+};
+
+// Upper bound on batch rows scanned for inventory reports. Above this the
+// result is marked truncated so the UI can warn.
+const MAX_BATCH_ROWS = 2000;
+
+/**
+ * Flat batch-level inventory snapshot powering both the Inventory Report
+ * (group by product → batch breakdown) and the Batch Report (one row per batch).
+ * Joined to products for human-readable identity (name/sku/barcode/category).
+ */
+export const batchInventory = query({
+  args: {
+    // When false (default), drop batches with nothing remaining so the report
+    // shows live stock only. Pass true to include depleted batches for auditing.
+    includeEmpty: v.optional(v.boolean()),
+    // Restrict to a single product to drive a per-product drill-down.
+    productId: v.optional(v.id("products")),
+  },
+  handler: async (ctx, args) => {
+    await requireRole(ctx, "admin");
+    const includeEmpty = args.includeEmpty ?? false;
+
+    const raw = await ctx.db.query("batches").take(MAX_BATCH_ROWS + 1);
+    const truncated = raw.length > MAX_BATCH_ROWS;
+    const batches = truncated ? raw.slice(0, MAX_BATCH_ROWS) : raw;
+
+    const productCache = new Map<
+      Id<"products">,
+      {
+        name: string;
+        sku: string;
+        barcode: string | null;
+        category: string;
+        productActive: boolean;
+      }
+    >();
+    const rows: BatchInventoryRow[] = [];
+
+    for (const b of batches) {
+      if (args.productId && b.productId !== args.productId) continue;
+      if (!includeEmpty && b.qtyRemaining <= 0) continue;
+      let p = productCache.get(b.productId);
+      if (p === undefined) {
+        const prod = await ctx.db.get("products", b.productId);
+        p = prod
+          ? {
+              name: prod.name,
+              sku: prod.sku,
+              barcode: prod.barcode ?? null,
+              category: prod.category,
+              productActive: prod.isActive,
+            }
+          : {
+              name: "(missing product)",
+              sku: "",
+              barcode: null,
+              category: "Uncategorized",
+              productActive: false,
+            };
+        productCache.set(b.productId, p);
+      }
+      rows.push({
+        productId: b.productId,
+        name: p.name,
+        sku: p.sku,
+        barcode: p.barcode,
+        category: p.category,
+        productActive: p.productActive,
+        batchId: b._id,
+        batchNumber: b.batchNumber,
+        qtyReceived: b.qtyReceived,
+        qtyRemaining: b.qtyRemaining,
+        unitCost: b.unitCost,
+        // Fall back to creation time for pre-migration legacy batches.
+        receivedDate: b.receivedDate ?? b._creationTime,
+        expiryDate: b.expiryDate ?? null,
+        batchActive: b.isActive,
+      });
+    }
+
+    rows.sort(
+      (a, b) =>
+        a.name.localeCompare(b.name) ||
+        a.sku.localeCompare(b.sku) ||
+        a.receivedDate - b.receivedDate,
+    );
+    return { rows, truncated };
+  },
+});

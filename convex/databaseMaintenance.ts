@@ -150,6 +150,22 @@ export const backfillBatchNumbersInternal = internalMutation({
   handler: async (ctx) => doBackfillBatchNumbers(ctx),
 });
 
+/**
+ * Kick off the idempotent batches.receivedDate backfill (self-scheduling
+ * pagination lives in migrations.ts). Safe to run repeatedly — rows that
+ * already have a receivedDate are skipped.
+ */
+export const startBatchReceivedDateBackfill = mutation({
+  args: {},
+  handler: async (ctx) => {
+    await requireRole(ctx, "admin");
+    await ctx.scheduler.runAfter(0, internal.migrations.backfillBatchReceivedDates, {
+      cursor: null,
+    });
+    return "receivedDate backfill scheduled";
+  },
+});
+
 export const resetWithMasterSeed = internalMutation({
   args: { confirm: v.string() },
   handler: async (ctx, args) => {

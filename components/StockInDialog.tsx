@@ -13,6 +13,12 @@ const MODE_OPTIONS: { value: Mode; label: string }[] = [
   { value: "existing", label: "Add to existing" },
 ];
 
+function todayString(): string {
+  const now = new Date();
+  const tz = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - tz).toISOString().slice(0, 10);
+}
+
 type Props = {
   open: boolean;
   productId?: Id<"products">;
@@ -28,6 +34,8 @@ export default function StockInDialog({ open, productId, productName, onClose }:
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
   const [quantity, setQuantity] = useState("");
   const [unitCost, setUnitCost] = useState("");
+  const [receivedDate, setReceivedDate] = useState<string>(todayString());
+  const [expiryDate, setExpiryDate] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -73,6 +81,12 @@ export default function StockInDialog({ open, productId, productName, onClose }:
         quantity: qty,
         unitCost: cost,
         targetBatchId: mode === "existing" ? (selectedBatchId as Id<"batches">) : undefined,
+        receivedDate:
+          mode === "new" ? new Date(receivedDate + "T00:00:00").getTime() : undefined,
+        expiryDate:
+          mode === "new" && expiryDate.trim()
+            ? new Date(expiryDate + "T00:00:00").getTime()
+            : undefined,
       });
       success("Stock added", `${qty} unit${qty === 1 ? "" : "s"} added to ${productName}.`);
       onClose();
@@ -157,6 +171,28 @@ export default function StockInDialog({ open, productId, productName, onClose }:
             placeholder="Defaults to product cost price"
           />
         </Field>
+
+        {mode === "new" && (
+          <>
+            <Field
+              label="Received date"
+              hint="When stock arrived — drives oldest-first (FIFO) deduction"
+            >
+              <Input
+                type="date"
+                value={receivedDate}
+                onChange={(e) => setReceivedDate(e.target.value)}
+              />
+            </Field>
+            <Field label="Expiry date" hint="Optional — for recall / FEFO tracking">
+              <Input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+              />
+            </Field>
+          </>
+        )}
 
         {error && (
           <Alert variant="destructive">

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { formatPeso } from "@/lib/format";
+import { formatPeso, formatDateOnly } from "@/lib/format";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import DateRangePicker from "@/components/DateRangePicker";
 import {
@@ -67,6 +67,7 @@ export default function ReportsPage() {
   const [preset, setPreset] = useState<Preset>("daily");
   const [customFrom, setCustomFrom] = useState<string>("");
   const [customTo, setCustomTo] = useState<string>("");
+  const [includeEmptyBatches, setIncludeEmptyBatches] = useState<boolean>(false);
 
   const range = useMemo(() => {
     if (preset === "custom") {
@@ -96,6 +97,11 @@ export default function ReportsPage() {
   const cashierRows = useQuery(
     api.reports.cashierPerformance,
     isAdmin ? { startMs: range.startMs, endMs: range.endMs } : "skip",
+  );
+
+  const batchInventory = useQuery(
+    api.reports.batchInventory,
+    isAdmin ? { includeEmpty: includeEmptyBatches } : "skip",
   );
 
   // Admin guard
@@ -450,6 +456,121 @@ export default function ReportsPage() {
                   />
                 }
               />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-success-bg text-success-fg">
+                <Icon name="layers" size={16} />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-text">Inventory by Batch</h2>
+                <p className="text-xs text-text-muted">
+                  Batch breakdown · FIFO received order · recall/expiry support
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <SegmentedControl
+                ariaLabel="Show empty batches"
+                value={includeEmptyBatches ? "all" : "live"}
+                onChange={(v) => setIncludeEmptyBatches(v === "all")}
+                options={[
+                  { value: "live", label: "Live stock" },
+                  { value: "all", label: "Include empty" },
+                ]}
+              />
+            </div>
+          </CardHeader>
+          <CardBody>
+            {batchInventory === undefined ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} height={20} />
+                ))}
+              </div>
+            ) : (
+              <>
+                {batchInventory.truncated && (
+                  <p className="mb-3 flex items-center gap-1.5 text-xs text-warning-fg">
+                    <Icon name="alert-triangle" size={14} />
+                    Large inventory — showing the first 2,000 batch rows.
+                  </p>
+                )}
+                <ResponsiveTable
+                  caption="Inventory by batch"
+                  rows={batchInventory.rows}
+                  rowKey={(r) => r.batchId}
+                  columns={[
+                    {
+                      key: "name",
+                      header: "Product",
+                      align: "left",
+                      cell: (r) => (
+                        <div>
+                          <div className="font-medium text-text">{r.name}</div>
+                          <div className="text-xs text-text-muted">
+                            SKU: {r.sku || "—"}
+                            {r.barcode ? ` · ${r.barcode}` : ""}
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: "batchNumber",
+                      header: "Batch",
+                      align: "left",
+                      className: "font-mono text-xs text-text-muted",
+                      cell: (r) => r.batchNumber,
+                    },
+                    {
+                      key: "qtyReceived",
+                      header: "Received",
+                      align: "right",
+                      className: "tabular-nums text-text-muted",
+                      cell: (r) => r.qtyReceived,
+                    },
+                    {
+                      key: "qtyRemaining",
+                      header: "Remaining",
+                      align: "right",
+                      className: "tabular-nums font-semibold text-text",
+                      cell: (r) => r.qtyRemaining,
+                    },
+                    {
+                      key: "receivedDate",
+                      header: "Recv. date",
+                      align: "right",
+                      className: "tabular-nums text-text-muted",
+                      cell: (r) => formatDateOnly(r.receivedDate),
+                    },
+                    {
+                      key: "expiryDate",
+                      header: "Expiry",
+                      align: "right",
+                      className: "tabular-nums text-text-muted",
+                      cell: (r) => (r.expiryDate ? formatDateOnly(r.expiryDate) : "—"),
+                    },
+                    {
+                      key: "value",
+                      header: "Cost value",
+                      align: "right",
+                      className: "tabular-nums text-text",
+                      cell: (r) => formatPeso(r.qtyRemaining * r.unitCost),
+                    },
+                  ]}
+                  empty={
+                    <EmptyState
+                      icon="layers"
+                      title="No batch inventory"
+                      description="Receive stock to populate the batch breakdown."
+                    />
+                  }
+                />
+              </>
             )}
           </CardBody>
         </Card>

@@ -96,6 +96,7 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                   productId: product._id,
                   name: product.name,
                   sku: product.sku,
+                  barcode: product.barcode,
                   sellPrice: product.sellPrice,
                   stockQty: product.stockQty,
                   quantity: 1,
@@ -149,9 +150,9 @@ export default function ProductGrid({ search, category, stockFilter, onAdd }: Pr
                 <p className="truncate text-xs font-bold text-text">
                   SKU: {product.sku}
                 </p>
-                {product.batchNumber && (
-                  <p className="truncate text-xs font-bold text-text">
-                    Batch: {product.batchNumber}
+                {product.barcode && (
+                  <p className="truncate font-mono text-xs text-text-muted">
+                    {product.barcode}
                   </p>
                 )}
                 <div className="mt-auto flex items-end justify-between gap-2 pt-1">

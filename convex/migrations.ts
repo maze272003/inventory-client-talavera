@@ -51,3 +51,33 @@ export const backfillBatches = internalMutation({
     }
   },
 });
+
+/**
+ * Idempotently backfill `receivedDate` on batches that predate the field.
+ * Sets receivedDate = _creationTime so the FIFO-by-receivedDate index is
+ * deterministic for legacy rows (otherwise missing values cluster first).
+ * Batches that already have a receivedDate are left untouched.
+ */
+export const backfillBatchReceivedDates = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
+      .query("batches")
+      .paginate({ numItems: BATCH_SIZE, cursor: args.cursor });
+
+    for (const batch of page.page) {
+      if (batch.receivedDate !== undefined) continue;
+      await ctx.db.patch("batches", batch._id, {
+        receivedDate: batch._creationTime,
+      });
+    }
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.backfillBatchReceivedDates,
+        { cursor: page.continueCursor },
+      );
+    }
+  },
+});

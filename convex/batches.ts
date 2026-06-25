@@ -17,7 +17,10 @@ export const listForProduct = query({
       _id: b._id,
       batchNumber: b.batchNumber,
       qtyRemaining: b.qtyRemaining,
+      qtyReceived: b.qtyReceived,
       unitCost: b.unitCost,
+      receivedDate: b.receivedDate,
+      expiryDate: b.expiryDate,
       _creationTime: b._creationTime,
     }));
   },

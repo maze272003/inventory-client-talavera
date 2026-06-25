@@ -116,6 +116,14 @@ export default function Cart({ items, onUpdate }: Props) {
                       <span className="truncate font-bold text-text">
                         SKU: {item.sku}
                       </span>
+                      {item.barcode && (
+                        <>
+                          <span aria-hidden className="text-text-subtle">·</span>
+                          <span className="truncate font-mono text-text-muted">
+                            {item.barcode}
+                          </span>
+                        </>
+                      )}
                       <span aria-hidden className="text-text-subtle">·</span>
                       <span className="text-text-muted">
                         {formatPeso(item.sellPrice)} each

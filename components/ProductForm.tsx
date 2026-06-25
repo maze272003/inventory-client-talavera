@@ -19,6 +19,7 @@ type ProductDoc = {
   _id: Id<"products">;
   name: string;
   sku: string;
+  barcode?: string;
   category: string;
   model?: string;
   costPrice: number;
@@ -46,6 +47,7 @@ export default function ProductForm({ product, open, onClose }: Props) {
 
   const [name, setName] = useState(product?.name ?? "");
   const [sku, setSku] = useState(product?.sku ?? "");
+  const [barcode, setBarcode] = useState(product?.barcode ?? "");
   const [category, setCategory] = useState(product?.category ?? "");
   const [model, setModel] = useState(product?.model ?? "");
   const [costPrice, setCostPrice] = useState(
@@ -148,6 +150,7 @@ export default function ProductForm({ product, open, onClose }: Props) {
           id: product._id,
           name: name.trim(),
           sku: sku.trim(),
+          barcode: barcode.trim(),
           category: category.trim(),
           model: model.trim(),
           costPrice: parseFloat(costPrice),
@@ -160,6 +163,7 @@ export default function ProductForm({ product, open, onClose }: Props) {
         const createArgs: Parameters<typeof createProduct>[0] = {
           name: name.trim(),
           sku: sku.trim(),
+          barcode: barcode.trim(),
           category: category.trim(),
           model: model.trim(),
           costPrice: parseFloat(costPrice),
@@ -232,6 +236,14 @@ export default function ProductForm({ product, open, onClose }: Props) {
               value={sku}
               onChange={(e) => setSku(e.target.value)}
               placeholder="e.g. SKU-001"
+            />
+          </Field>
+          <Field label="Barcode" hint="EAN/UPC scanned at POS">
+            <Input
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              placeholder="e.g. 4801234567890"
+              inputMode="numeric"
             />
           </Field>
           <Field label="Category" required>

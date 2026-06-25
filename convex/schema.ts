@@ -32,6 +32,11 @@ export default defineSchema({
   products: defineTable({
     name: v.string(),
     sku: v.string(),
+    // Barcode is the primary scan identifier at the POS. A product has exactly
+    // one barcode (EAN/UPC). Optional only for legacy rows / products without a
+    // printed barcode; uniqueness is enforced by products.create/update for any
+    // non-empty value. An empty string means "no barcode" and is not unique.
+    barcode: v.optional(v.string()),
     batchNumber: v.optional(v.string()),
     category: v.string(),
     model: v.optional(v.string()),
@@ -43,6 +48,7 @@ export default defineSchema({
     isActive: v.boolean(),
   })
     .index("by_sku", ["sku"])
+    .index("by_barcode", ["barcode"])
     .index("by_batchNumber", ["batchNumber"])
     .index("by_category", ["category"])
     .index("by_active", ["isActive"])
@@ -118,10 +124,19 @@ export default defineSchema({
     unitCost: v.number(),
     source: batchSourceValidator,
     purchaseId: v.optional(v.id("purchases")),
+    // Date the stock was physically received (ms since epoch). Drives FIFO
+    // ordering so backdated receipts deduct in true oldest-first order, and
+    // supports product-recall / expiry analysis. Defaults to _creationTime via
+    // the backfill migration when absent.
+    receivedDate: v.optional(v.number()),
+    // Optional expiry / sell-by date for recall support and FEFO reporting.
+    expiryDate: v.optional(v.number()),
     isActive: v.boolean(),
   })
     .index("by_product", ["productId"])
     .index("by_product_active", ["productId", "isActive"])
+    // FIFO walk: active batches for a product in received-date (oldest) order.
+    .index("by_product_active_received", ["productId", "isActive", "receivedDate"])
     .index("by_batchNumber", ["batchNumber"]),
 
   saleItemBatches: defineTable({

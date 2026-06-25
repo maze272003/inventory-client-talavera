@@ -15,10 +15,12 @@ const lineValidator = v.object({
       model: v.optional(v.string()),
       category: v.string(),
       sellPrice: v.number(),
+      barcode: v.optional(v.string()),
     }),
   ),
   quantity: v.number(),
   unitCost: v.number(),
+  expiryDate: v.optional(v.number()),
 });
 
 export const createPurchase = mutation({
@@ -63,9 +65,11 @@ export const createPurchase = mutation({
         // Products entered via PDF import get an auto-generated batch number too,
         // matching products.create (the manual entry path).
         const batchNumber = await nextBatchNumber(ctx, Date.now());
+        const barcode = np.barcode?.trim() || undefined;
         productId = await ctx.db.insert("products", {
           name: np.name,
           sku: "",
+          barcode,
           category: np.category,
           model: np.model,
           costPrice: line.unitCost,
@@ -88,6 +92,10 @@ export const createPurchase = mutation({
         unitCost: line.unitCost,
         source: "purchase",
         purchaseId,
+        // The batch inherits the invoice's receive date so FIFO reflects when
+        // stock actually arrived, not when the record was keyed in.
+        receivedDate: args.purchaseDate,
+        expiryDate: line.expiryDate,
         isActive: true,
       });
       const balanceAfter = await recomputeStockQty(ctx, product._id);

@@ -44,3 +44,44 @@ test("backfill skips zero-stock products", async () => {
   expect(stockedBatches).toHaveLength(1);
   expect(zeroBatches).toHaveLength(0);
 });
+
+test("backfillBatchReceivedDates sets receivedDate=_creationTime for legacy batches, idempotently", async () => {
+  const t = convexTest(schema, modules);
+  const batchId = await t.run(async (ctx) => {
+    const pid = await ctx.db.insert("products", {
+      name: "Legacy Batch", sku: "LB1", category: "C",
+      costPrice: 1, sellPrice: 2, stockQty: 7, reorderThreshold: 0, isActive: true,
+    });
+    return await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-LEG-1",
+      qtyReceived: 7, qtyRemaining: 7, unitCost: 1, source: "opening",
+      isActive: true,
+    });
+  });
+
+  // First run: backfills the missing receivedDate.
+  await t.mutation(internal.migrations.backfillBatchReceivedDates, { cursor: null });
+  const after1 = await t.run(async (ctx) => ctx.db.get("batches", batchId));
+  expect(after1?.receivedDate).toEqual(after1!._creationTime);
+
+  // Second run: no-op (already set).
+  await t.mutation(internal.migrations.backfillBatchReceivedDates, { cursor: null });
+  const after2 = await t.run(async (ctx) => ctx.db.get("batches", batchId));
+  expect(after2?.receivedDate).toEqual(after1!._creationTime);
+
+  // Batches that already carry a receivedDate are preserved.
+  const kept = await t.run(async (ctx) => {
+    const pid = await ctx.db.insert("products", {
+      name: "Dated", sku: "D1", category: "C",
+      costPrice: 1, sellPrice: 2, stockQty: 1, reorderThreshold: 0, isActive: true,
+    });
+    return await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-DATED",
+      qtyReceived: 1, qtyRemaining: 1, unitCost: 1, source: "opening",
+      receivedDate: 1_234_000, isActive: true,
+    });
+  });
+  await t.mutation(internal.migrations.backfillBatchReceivedDates, { cursor: null });
+  const dated = await t.run(async (ctx) => ctx.db.get("batches", kept));
+  expect(dated?.receivedDate).toBe(1_234_000);
+});

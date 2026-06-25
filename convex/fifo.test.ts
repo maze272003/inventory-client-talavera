@@ -80,3 +80,39 @@ test("FIFO throws and writes nothing when stock is insufficient", async () => {
     }),
   ).rejects.toThrow(/Insufficient stock/);
 });
+
+test("FIFO drains by receivedDate, not creation time", async () => {
+  const t = convexTest(schema, modules);
+  const pid = await t.run(async (ctx) => {
+    const userId = await ctx.db.insert("users", { email: "a@b.c" });
+    await ctx.db.insert("userProfiles", { userId, name: "Admin", role: "admin" });
+    const pid = await ctx.db.insert("products", {
+      name: "Widget", sku: "W2", category: "C", costPrice: 5, sellPrice: 10,
+      stockQty: 0, reorderThreshold: 0, isActive: true,
+    });
+    // Batch A: created FIRST but received LATER.
+    await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-LATER",
+      qtyReceived: 10, qtyRemaining: 10, unitCost: 5, source: "stock_in",
+      receivedDate: 2_000_000, isActive: true,
+    });
+    // Batch B: created SECOND but received EARLIER (backdated receipt).
+    await ctx.db.insert("batches", {
+      productId: pid, batchNumber: "BN-EARLIER",
+      qtyReceived: 10, qtyRemaining: 10, unitCost: 5, source: "stock_in",
+      receivedDate: 1_000_000, isActive: true,
+    });
+    await ctx.db.patch("products", pid, { stockQty: 20 });
+    return pid;
+  });
+
+  const allocations = await t.run(async (ctx) => {
+    const { allocateFifo } = await import("./lib/fifo");
+    const userId = (await ctx.db.query("users").first())!._id;
+    return await allocateFifo(ctx, pid, 4, "sale", { userId });
+  });
+
+  // Despite BN-LATER being created first, the earlier-received batch drains.
+  expect(allocations.map((a) => a.batchNumber)).toEqual(["BN-EARLIER"]);
+  expect(allocations[0].quantity).toBe(4);
+});

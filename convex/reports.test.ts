@@ -206,3 +206,52 @@ test("cashFlow buckets sales revenue against purchase spend", async () => {
   const withRevenue = res.buckets.find((b) => b.revenue > 0);
   expect(withRevenue).toBeDefined();
 });
+
+test("batchInventory returns a per-batch breakdown with received/expiry dates", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Oil", sku: "O1", barcode: "4801234567890", category: "Oil",
+    costPrice: 100, sellPrice: 180, stockQty: 50, reorderThreshold: 5,
+  });
+  // A second batch (stock-in) with its own receive + expiry dates.
+  await admin.mutation(api.inventory.stockIn, {
+    productId: pid,
+    quantity: 30,
+    unitCost: 110,
+    receivedDate: 5_000_000,
+    expiryDate: 99_000_000,
+  });
+
+  const res = await admin.query(api.reports.batchInventory, { includeEmpty: false });
+  expect(res.truncated).toBe(false);
+  const rows = res.rows.filter((r) => r.productId === pid);
+  expect(rows).toHaveLength(2);
+  expect(rows.every((r) => r.barcode === "4801234567890")).toBe(true);
+  const totals = rows.reduce((s, r) => s + r.qtyRemaining, 0);
+  expect(totals).toBe(80); // 50 + 30
+  // Sorted oldest-received first; the backdated (5_000_000) batch should lead
+  // among the two once product/creation tie-break resolves — assert presence of expiry.
+  const withExpiry = rows.find((r) => r.expiryDate === 99_000_000);
+  expect(withExpiry?.qtyRemaining).toBe(30);
+});
+
+test("batchInventory hides empty batches unless includeEmpty is set", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seed(t, "admin");
+  const pid = await admin.mutation(api.products.create, {
+    name: "Gone", sku: "G1", category: "X",
+    costPrice: 1, sellPrice: 2, stockQty: 5, reorderThreshold: 0,
+  });
+  // Drain all stock so the only batch is empty.
+  await admin.mutation(api.sales.createSale, {
+    items: [{ productId: pid, quantity: 5 }],
+    cashTendered: 100,
+  });
+
+  const live = await admin.query(api.reports.batchInventory, { includeEmpty: false });
+  expect(live.rows.filter((r) => r.productId === pid)).toHaveLength(0);
+
+  const all = await admin.query(api.reports.batchInventory, { includeEmpty: true });
+  expect(all.rows.filter((r) => r.productId === pid)).toHaveLength(1);
+});

@@ -13,6 +13,8 @@ export const stockIn = mutation({
     quantity: v.number(),
     unitCost: v.optional(v.number()),
     targetBatchId: v.optional(v.id("batches")),
+    receivedDate: v.optional(v.number()),
+    expiryDate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { userId } = await requireRole(ctx, "admin");
@@ -41,6 +43,8 @@ export const stockIn = mutation({
         qtyRemaining: args.quantity,
         unitCost,
         source: "stock_in",
+        receivedDate: args.receivedDate ?? Date.now(),
+        expiryDate: args.expiryDate,
         isActive: true,
       });
     }
@@ -94,6 +98,7 @@ export const adjust = mutation({
         qtyRemaining: delta,
         unitCost: product.costPrice,
         source: "adjustment",
+        receivedDate: Date.now(),
         isActive: true,
       });
       actualStockQty = await recomputeStockQty(ctx, args.productId);

@@ -8,17 +8,17 @@ export type Allocation = {
   unitCost: number;
 };
 
-/** Active batches for a product, oldest first (FIFO order). Bounded read. */
+/** Active batches for a product, oldest-first by received date (FIFO order).
+ *  Backdated receipts therefore deduct before newer ones. Bounded read. */
 export async function activeBatchesOldestFirst(
   ctx: MutationCtx,
   productId: Id<"products">,
 ): Promise<Doc<"batches">[]> {
   return await ctx.db
     .query("batches")
-    .withIndex("by_product_active", (q) =>
+    .withIndex("by_product_active_received", (q) =>
       q.eq("productId", productId).eq("isActive", true),
     )
-    .order("asc")
     // Safety cap: a single product is not expected to exceed 500 concurrently-active
     // batches. If that assumption ever changes (e.g. very high-frequency small receipts),
     // this must be replaced with a paginated loop to avoid silently truncating FIFO order.

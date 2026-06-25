@@ -16,6 +16,7 @@ export type CartItem = {
   productId: Id<"products">;
   name: string;
   sku: string;
+  barcode?: string;
   sellPrice: number;
   stockQty: number; // product's actual stock, for warning
   quantity: number;
@@ -28,28 +29,29 @@ type Props = {
 };
 
 /**
- * Inner component that runs the SKU query and fires callbacks when the result
- * arrives. Remounted via `key` for each new lookup.
+ * Inner component that runs the identity (barcode-or-SKU) query and fires
+ * callbacks when the result arrives. Remounted via `key` for each new lookup.
+ * Barcode is checked first (primary scan identifier), then SKU.
  */
-function SkuLookup({
-  sku,
+function IdentityLookup({
+  code,
   onFound,
   onNotFound,
 }: {
-  sku: string;
+  code: string;
   onFound: (product: ScannedProduct) => void;
-  onNotFound: (sku: string) => void;
+  onNotFound: (code: string) => void;
 }) {
-  const result = useQuery(api.products.getBySku, { sku });
+  const result = useQuery(api.products.getByIdentity, { code });
 
   useEffect(() => {
     if (result === undefined) return;
     if (result !== null) {
       onFound(result);
     } else {
-      onNotFound(sku);
+      onNotFound(code);
     }
-  }, [result, sku, onFound, onNotFound]);
+  }, [result, code, onFound, onNotFound]);
 
   return null;
 }
@@ -86,10 +88,10 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
   forwardedRef
 ) {
   const [inputValue, setInputValue] = useState("");
-  const [lookupSku, setLookupSku] = useState<string | null>(null);
+  const [lookupCode, setLookupCode] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string | null>(null);
-  const [skuNotFound, setSkuNotFound] = useState(false);
-  // Key bumps to remount SkuLookup / BatchLookup for a fresh query each time
+  const [codeNotFound, setCodeNotFound] = useState(false);
+  // Key bumps to remount IdentityLookup / BatchLookup for a fresh query each time
   const [lookupKey, setLookupKey] = useState(0);
   // Batch-number lookup: set when an SKU miss reveals a BN- term
   const [batchLookupTerm, setBatchLookupTerm] = useState<string | null>(null);
@@ -132,9 +134,9 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
 
   const resetSearch = useCallback(() => {
     setInputValue("");
-    setLookupSku(null);
+    setLookupCode(null);
     setBatchLookupTerm(null);
-    setSkuNotFound(false);
+    setCodeNotFound(false);
     setSearchTerm(null);
   }, []);
 
@@ -144,6 +146,7 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
         productId: product._id,
         name: product.name,
         sku: product.sku,
+        barcode: product.barcode,
         sellPrice: product.sellPrice,
         stockQty: product.stockQty,
         quantity: qty,
@@ -200,19 +203,19 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
     [qtyInCart, resetSearch],
   );
 
-  const handleSkuFound = useCallback(
+  const handleCodeFound = useCallback(
     (product: ScannedProduct) => tryAddProduct(product),
     [tryAddProduct],
   );
 
-  const handleSkuNotFound = useCallback((sku: string) => {
-    setLookupSku(null);
-    if (/^BN-/i.test(sku)) {
+  const handleCodeNotFound = useCallback((code: string) => {
+    setLookupCode(null);
+    if (/^BN-/i.test(code)) {
       // Term looks like a batch number — try BatchLookup before falling back.
-      setBatchLookupTerm(sku);
+      setBatchLookupTerm(code);
     } else {
-      setSkuNotFound(true);
-      setSearchTerm(sku);
+      setCodeNotFound(true);
+      setSearchTerm(code);
     }
   }, []);
 
@@ -223,17 +226,17 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
 
   const handleBatchNotFound = useCallback((bn: string) => {
     setBatchLookupTerm(null);
-    setSkuNotFound(true);
+    setCodeNotFound(true);
     setSearchTerm(bn);
   }, []);
 
   const submitValue = useCallback((raw: string) => {
     const val = raw.trim();
     if (!val) return;
-    setSkuNotFound(false);
+    setCodeNotFound(false);
     setSearchTerm(null);
     setBatchLookupTerm(null);
-    setLookupSku(val);
+    setLookupCode(val);
     setLookupKey((k) => k + 1);
   }, []);
 
@@ -250,8 +253,8 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     setInputValue(e.target.value);
-    if (skuNotFound || searchTerm !== null || batchLookupTerm !== null) {
-      setSkuNotFound(false);
+    if (codeNotFound || searchTerm !== null || batchLookupTerm !== null) {
+      setCodeNotFound(false);
       setSearchTerm(null);
       setBatchLookupTerm(null);
     }
@@ -262,7 +265,7 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
       <div className="flex items-end gap-2">
         <Field
           label="Barcode / SKU / Name"
-          hint={skuNotFound ? undefined : "Scan a barcode or type a SKU, then press Enter."}
+          hint={codeNotFound ? undefined : "Scan a barcode or type a SKU, then press Enter."}
           className="flex-1"
         >
           <Input
@@ -296,17 +299,17 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
         }}
       />
 
-      {/* SKU lookup — mounted only when a lookup is in flight */}
-      {lookupSku !== null && (
-        <SkuLookup
+      {/* Identity (barcode-or-SKU) lookup — mounted only when a lookup is in flight */}
+      {lookupCode !== null && (
+        <IdentityLookup
           key={lookupKey}
-          sku={lookupSku}
-          onFound={handleSkuFound}
-          onNotFound={handleSkuNotFound}
+          code={lookupCode}
+          onFound={handleCodeFound}
+          onNotFound={handleCodeNotFound}
         />
       )}
 
-      {/* Batch-number lookup — mounted only when an SKU miss reveals a BN- term */}
+      {/* Batch-number lookup — mounted only when an identity miss reveals a BN- term */}
       {batchLookupTerm !== null && (
         <BatchLookup
           key={`batch-${lookupKey}`}
@@ -316,10 +319,10 @@ const ProductSearch = forwardRef<HTMLInputElement, Props>(function ProductSearch
         />
       )}
 
-      {skuNotFound && (
+      {codeNotFound && (
         <p className="flex items-center gap-1.5 text-xs text-warning-fg" role="status">
           <Icon name="alert-triangle" size={14} />
-          SKU not found — showing name search results below.
+          No barcode/SKU match — showing name search results below.
         </p>
       )}
       {searchResults && searchResults.length > 0 && (

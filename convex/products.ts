@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, QueryCtx } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { requireRole, requireUser } from "./lib/auth";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { recordAudit } from "./lib/audit";
 import { nextBatchNumber } from "./lib/batch";
 
@@ -35,10 +35,49 @@ function passesStockFilter(p: Doc<"products">, f: string | undefined): boolean {
   }
 }
 
+/** Normalize a barcode: trimmed, empty → undefined (treated as "no barcode"). */
+function normalizeBarcode(barcode: string | undefined): string | undefined {
+  const v = barcode?.trim();
+  return v ? v : undefined;
+}
+
+/**
+ * Enforce product identity uniqueness (SKU always; barcode when non-empty).
+ * Guarantees the "one product = one SKU = one barcode" invariant at the source,
+ * which is what prevents duplicate product records. `exceptId` excludes the
+ * product being edited during an update.
+ */
+async function assertIdentityAvailable(
+  ctx: QueryCtx,
+  args: { sku: string; barcode?: string; exceptId?: Id<"products"> },
+): Promise<void> {
+  const sku = args.sku.trim();
+  if (sku) {
+    const skuConflict = await ctx.db
+      .query("products")
+      .withIndex("by_sku", (q) => q.eq("sku", sku))
+      .first();
+    if (skuConflict && skuConflict._id !== args.exceptId) {
+      throw new Error(`A product with SKU "${sku}" already exists`);
+    }
+  }
+  const barcode = normalizeBarcode(args.barcode);
+  if (barcode) {
+    const bcConflict = await ctx.db
+      .query("products")
+      .withIndex("by_barcode", (q) => q.eq("barcode", barcode))
+      .first();
+    if (bcConflict && bcConflict._id !== args.exceptId) {
+      throw new Error(`A product with barcode "${barcode}" already exists`);
+    }
+  }
+}
+
 export const create = mutation({
   args: {
     name: v.string(),
     sku: v.string(),
+    barcode: v.optional(v.string()),
     category: v.string(),
     model: v.optional(v.string()),
     imageId: v.optional(v.id("_storage")),
@@ -49,8 +88,11 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireRole(ctx, "admin");
+    await assertIdentityAvailable(ctx, { sku: args.sku, barcode: args.barcode });
     const batchNumber = await nextBatchNumber(ctx, Date.now());
-    const id = await ctx.db.insert("products", { ...args, isActive: true, batchNumber });
+    const barcode = normalizeBarcode(args.barcode);
+    const productDoc = { ...args, barcode, isActive: true, batchNumber };
+    const id = await ctx.db.insert("products", productDoc);
     if (args.stockQty > 0) {
       const batchId = await ctx.db.insert("batches", {
         productId: id,
@@ -59,6 +101,7 @@ export const create = mutation({
         qtyRemaining: args.stockQty,
         unitCost: args.costPrice,
         source: "opening",
+        receivedDate: Date.now(),
         isActive: true,
       });
       await ctx.db.insert("inventoryLedger", {
@@ -91,6 +134,7 @@ export const update = mutation({
     id: v.id("products"),
     name: v.string(),
     sku: v.string(),
+    barcode: v.optional(v.string()),
     category: v.string(),
     model: v.optional(v.string()),
     imageId: v.optional(v.id("_storage")),
@@ -103,10 +147,18 @@ export const update = mutation({
     const { id, ...fields } = args;
     const existing = await ctx.db.get("products", id);
     if (!existing) throw new Error("Product not found");
+    await assertIdentityAvailable(ctx, {
+      sku: args.sku,
+      barcode: args.barcode,
+      exceptId: id,
+    });
+    // Normalize barcode the same way create does so equality holds.
+    const barcode = normalizeBarcode(args.barcode);
     // Snapshot only the mutable fields so an undo can patch them back exactly.
     const before = {
       name: existing.name,
       sku: existing.sku,
+      barcode: existing.barcode,
       category: existing.category,
       model: existing.model,
       imageId: existing.imageId,
@@ -114,15 +166,15 @@ export const update = mutation({
       sellPrice: existing.sellPrice,
       reorderThreshold: existing.reorderThreshold,
     };
-    // batchNumber is immutable: intentionally omitted from `fields`/patch so it is preserved.
-    await ctx.db.patch("products", id, fields);
+    // batchNumber is immutable: intentionally omitted so it is preserved.
+    await ctx.db.patch("products", id, { ...fields, barcode });
     await recordAudit(ctx, {
       entityTable: "products",
       entityId: id,
       action: "update",
       summary: `Updated product ${fields.name}`,
       before,
-      after: fields,
+      after: { ...fields, barcode },
       undoable: true,
       userId,
     });
@@ -218,6 +270,46 @@ export const getBySku = query({
       .query("products")
       .withIndex("by_sku", (q) => q.eq("sku", args.sku))
       .unique();
+    return product ? await withImageUrl(ctx, product) : null;
+  },
+});
+
+export const getByBarcode = query({
+  args: { barcode: v.string() },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+    const code = args.barcode.trim();
+    if (!code) return null;
+    const product = await ctx.db
+      .query("products")
+      .withIndex("by_barcode", (q) => q.eq("barcode", code))
+      .first();
+    return product ? await withImageUrl(ctx, product) : null;
+  },
+});
+
+/**
+ * Primary POS scan lookup. Resolves a scanned/code string to a single product by
+ * checking barcode first (the primary scan identifier), then SKU. Returns null
+ * when neither matches — the caller then falls back to batch-number / name search.
+ * This is what makes barcode scanning work without asking the cashier to pick a batch.
+ */
+export const getByIdentity = query({
+  args: { code: v.string() },
+  handler: async (ctx, args) => {
+    await requireUser(ctx);
+    const code = args.code.trim();
+    if (!code) return null;
+    const byBarcode = await ctx.db
+      .query("products")
+      .withIndex("by_barcode", (q) => q.eq("barcode", code))
+      .first();
+    const product =
+      byBarcode ??
+      (await ctx.db
+        .query("products")
+        .withIndex("by_sku", (q) => q.eq("sku", code))
+        .first());
     return product ? await withImageUrl(ctx, product) : null;
   },
 });
