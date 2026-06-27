@@ -51,5 +51,5 @@ export const NAV_GROUPS: NavGroup[] = [
 /** Cashier essentials surfaced in the phone bottom tab bar (thumb-reachable). */
 export const BOTTOM_TAB_HREFS = ["/dashboard", "/pos", "/receipts"];
 
-export const APP_TITLE = "MotorShop POS";
+export const APP_TITLE = "AZI MOTOR SHOP";
 export const APP_SUBTITLE = "Sales & Inventory";

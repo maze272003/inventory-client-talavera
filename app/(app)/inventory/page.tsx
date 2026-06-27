@@ -7,6 +7,7 @@ import { Id } from "@/convex/_generated/dataModel";
 import StockInDialog from "@/components/StockInDialog";
 import AdjustDialog from "@/components/AdjustDialog";
 import LedgerDrawer from "@/components/LedgerDrawer";
+import ProductForm from "@/components/ProductForm";
 import { ImportInvoiceModal } from "@/components/inventory/ImportInvoiceModal";
 import { PurchasesModal } from "@/components/inventory/PurchasesModal";
 import {
@@ -359,10 +360,18 @@ function LowStockSection({ onOpenImport }: { onOpenImport: () => void }) {
 
 export default function InventoryPage() {
   const currentUser = useQuery(api.users.currentUser);
-  const [modal, setModal] = useState<"import" | "purchases" | null>(null);
+  const [modal, setModal] = useState<"import" | "purchases" | "addProduct" | null>(null);
 
   const headerActions = (
     <>
+      <Button
+        onClick={() => setModal("addProduct")}
+        leftIcon={<Icon name="plus" size={16} />}
+        className="shadow-primary"
+      >
+        <span className="hidden sm:inline">Add Product</span>
+        <span className="sm:hidden">Add</span>
+      </Button>
       <Button
         variant="secondary"
         size="sm"
@@ -442,6 +451,13 @@ export default function InventoryPage() {
         open={modal === "purchases"}
         onClose={() => setModal(null)}
       />
+      {modal === "addProduct" && (
+        <ProductForm
+          key="add-product"
+          open={modal === "addProduct"}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }

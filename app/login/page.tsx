@@ -62,7 +62,7 @@ export default function LoginPage() {
             <Icon name="wrench" />
           </span>
           <span className="text-lg font-semibold tracking-tight">
-            MotorShop POS
+            AZI MOTOR SHOP
           </span>
         </div>
 
@@ -104,7 +104,7 @@ export default function LoginPage() {
               <Icon name="wrench" />
             </span>
             <span className="text-base font-semibold text-text">
-              MotorShop POS
+              AZI MOTOR SHOP
             </span>
           </div>
 
@@ -193,7 +193,7 @@ export default function LoginPage() {
           </Card>
 
           <p className="mt-6 text-center text-xs text-text-muted">
-            &copy; 2026 MotorShop POS &middot; Motor parts retail &amp; repair
+            &copy; 2026 AZI MOTOR SHOP &middot; Motor parts retail &amp; repair
           </p>
         </div>
       </div>
