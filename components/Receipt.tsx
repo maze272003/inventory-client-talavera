@@ -89,7 +89,7 @@ export default function Receipt({ saleId }: Props) {
       >
         {/* Header */}
         <div className="mb-3 text-center">
-          <p className="text-base font-bold">Talavera Store</p>
+          <p className="text-base font-bold">AZI MOTORSHOP</p>
           <p className="text-text-muted">Official Receipt</p>
         </div>
 
