@@ -6,7 +6,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useTheme } from "@/components/ThemeProvider";
-import { cn, Icon } from "@/components/ui";
+import { cn, Icon, BrandLogo } from "@/components/ui";
 import { ConnectionStatus } from "@/components/ui";
 import { APP_TITLE } from "./navConfig";
 
@@ -72,9 +72,7 @@ export default function Topbar({ onOpenMenu }: { onOpenMenu: () => void }) {
 
       {/* Mobile brand */}
       <span className="flex items-center gap-2 md:hidden">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg text-primary-fg bg-brand-gradient">
-          <Icon name="wrench" size={16} />
-        </span>
+        <BrandLogo size={32} alt="" />
         <span className="text-sm font-bold text-text">{APP_TITLE}</span>
       </span>
 

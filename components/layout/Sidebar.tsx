@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { cn, Icon } from "@/components/ui";
+import { cn, Icon, BrandLogo } from "@/components/ui";
 import { ConnectionStatus, UserMenu } from "@/components/ui";
 import { useSidebar } from "./SidebarContext";
 import { APP_TITLE, NAV_GROUPS } from "./navConfig";
@@ -25,12 +25,7 @@ function BrandMark({ collapsed }: { collapsed: boolean }) {
         collapsed && "lg:justify-center lg:px-0",
       )}
     >
-      <span
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-primary-fg shadow-primary bg-brand-gradient"
-        aria-hidden="true"
-      >
-        <Icon name="wrench" size={18} />
-      </span>
+      <BrandLogo size={36} priority alt="" className="shadow-primary" />
       <div className={cn("min-w-0", collapsed && "lg:hidden")}>
         <p className="truncate text-sm font-bold leading-tight text-text">
           {APP_TITLE}

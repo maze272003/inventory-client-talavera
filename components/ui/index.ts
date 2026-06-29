@@ -12,6 +12,10 @@ export type { ClassValue } from "./cn";
 export { Icon } from "./Icon";
 export type { IconName, IconProps } from "./Icon";
 
+// brand
+export { BrandLogo } from "./BrandLogo";
+export type { BrandLogoProps } from "./BrandLogo";
+
 // primitives
 export { Button } from "./Button";
 export type { ButtonProps, ButtonVariant, ButtonSize } from "./Button";
