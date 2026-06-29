@@ -14,7 +14,7 @@
    ────────────────────────────────────────────────────────────── */
 
 :root {
-  /* Color — neutral slate base, indigo primary */
+  /* Color — neutral slate base, AZI ignition-red primary (matches login) */
   --color-bg: #f1f5f9; /* slate-100 — app canvas (subtle depth vs surface) */
   --color-surface: #ffffff; /* cards / panels */
   --color-surface-2: #f1f5f9; /* slate-100 — subtle raised / hover */
@@ -25,11 +25,11 @@
   --color-text-muted: #64748b; /* slate-500 */
   --color-text-subtle: #94a3b8; /* slate-400 — tertiary */
 
-  --color-primary: #4f46e5; /* indigo-600 */
-  --color-primary-hover: #4338ca; /* indigo-700 */
+  --color-primary: #e1232f; /* AZI ignition red — brand accent (matches login) */
+  --color-primary-hover: #c11420; /* deeper ignition — hover / active */
   --color-primary-fg: #ffffff;
-  --color-primary-soft: #eef2ff; /* indigo-50 — tinted backgrounds */
-  --color-primary-soft-fg: #4338ca; /* indigo-700 text on tint */
+  --color-primary-soft: #fef2f2; /* red-50 — tinted backgrounds */
+  --color-primary-soft-fg: #b3121f; /* deep red text on tint */
 
   --color-success: #059669; /* emerald-600 */
   --color-success-fg: #ffffff;
@@ -48,16 +48,16 @@
   --color-info-bg: #e0f2fe; /* sky-100 */
 
   /* Focus ring color */
-  --color-ring: #6366f1; /* indigo-500 */
+  --color-ring: #f0454b; /* ignition red focus — matches login button tone */
 
   /* Brand gradient — used for hero accents, brand marks, primary CTAs */
   --gradient-primary: linear-gradient(
     135deg,
-    #6366f1 0%,
-    #4f46e5 50%,
-    #4338ca 100%
+    #f0454b 0%,
+    #e1232f 50%,
+    #c11420 100%
   );
-  --gradient-brand: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
+  --gradient-brand: linear-gradient(135deg, #f0454b 0%, #c11420 100%);
 
   /* Radius */
   --radius-sm: 0.25rem; /* 4px  */
@@ -78,7 +78,7 @@
   --shadow-pop:
     0 12px 32px -8px rgb(15 23 42 / 0.18), 0 4px 12px -4px rgb(15 23 42 / 0.1);
   --shadow-subtle: 0 0 0 1px rgb(15 23 42 / 0.04);
-  --shadow-primary: 0 8px 20px -6px rgb(79 70 229 / 0.45);
+  --shadow-primary: 0 8px 20px -6px rgb(225 35 47 / 0.45);
 
   /* Layout metrics — the fixed app shell */
   --topbar-h: 4rem; /* 64px fixed top navigation bar */
@@ -127,11 +127,11 @@ html.dark {
   --color-text-muted: #94a3b8; /* slate-400 */
   --color-text-subtle: #64748b; /* slate-500 */
 
-  --color-primary: #6366f1; /* indigo-500 */
-  --color-primary-hover: #818cf8; /* indigo-400 */
+  --color-primary: #f0454b; /* brighter ignition for dark canvas */
+  --color-primary-hover: #f56b70; /* lighter ignition — hover / active */
   --color-primary-fg: #ffffff;
-  --color-primary-soft: #1e1b4b; /* indigo-950 */
-  --color-primary-soft-fg: #c7d2fe; /* indigo-300 */
+  --color-primary-soft: #4c0a12; /* deep crimson — tinted backgrounds */
+  --color-primary-soft-fg: #fca5a5; /* light red text on tint */
 
   --color-success: #10b981; /* emerald-500 */
   --color-success-fg: #022c22;
@@ -149,15 +149,15 @@ html.dark {
   --color-info-fg: #082f49;
   --color-info-bg: #0c4a6e; /* sky-900 */
 
-  --color-ring: #818cf8; /* indigo-400 */
+  --color-ring: #f56b70; /* ignition red focus */
 
   --gradient-primary: linear-gradient(
     135deg,
-    #818cf8 0%,
-    #6366f1 50%,
-    #4f46e5 100%
+    #f56b70 0%,
+    #f0454b 50%,
+    #d11421 100%
   );
-  --gradient-brand: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  --gradient-brand: linear-gradient(135deg, #f56b70 0%, #d11421 100%);
 
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
@@ -169,7 +169,7 @@ html.dark {
   --shadow-pop:
     0 12px 32px -8px rgb(0 0 0 / 0.6), 0 4px 12px -4px rgb(0 0 0 / 0.45);
   --shadow-subtle: 0 0 0 1px rgb(255 255 255 / 0.04);
-  --shadow-primary: 0 8px 20px -6px rgb(99 102 249 / 0.5);
+  --shadow-primary: 0 8px 20px -6px rgb(240 69 75 / 0.5);
 }
 
 /* Density preference — comfortable (default) vs compact.
